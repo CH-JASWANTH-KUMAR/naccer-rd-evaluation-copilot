@@ -1,0 +1,14 @@
+# Development PDF storage
+storage/
+storage/documents/*
+!storage/documents/.gitkeep
+
+# Python bytecode & virtualenv
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
