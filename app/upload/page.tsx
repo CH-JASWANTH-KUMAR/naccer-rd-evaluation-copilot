@@ -79,18 +79,15 @@ export default function UploadProposalPage() {
     setErrorMessage(null);
 
     try {
-      // 1. Create Proposal Record
-      const newProposal = await proposalService.createProposal({
-        title,
-        institution_id: institutionId,
-        principal_investigator: piName,
-        domain,
-        budget_total: parseFloat(budget) || 0,
-      });
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+      formData.append("principal_investigator", piName);
+      formData.append("domain", domain);
+      if (institutionId) formData.append("institution_id", institutionId);
 
+      const newProposal = await proposalService.uploadProposalPdf(formData);
       setCreatedProposalId(newProposal.id);
 
-      // 2. Upload & Process PDF Document
       const docResult = await documentService.uploadDocument(newProposal.id, selectedFile);
       setProcessedDoc(docResult);
     } catch (err: unknown) {

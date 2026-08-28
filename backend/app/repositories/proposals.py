@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.proposal import Proposal
@@ -9,12 +9,36 @@ class ProposalRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_all(self, domain: str | None = None, status: str | None = None) -> list[Proposal]:
+    def get_all(
+        self,
+        domain: str | None = None,
+        status: str | None = None,
+        completeness_status: str | None = None,
+        compliance_status: str | None = None,
+        search: str | None = None,
+    ) -> list[Proposal]:
         stmt = select(Proposal).options(joinedload(Proposal.institution)).order_by(Proposal.created_at.desc())
+
         if domain:
             stmt = stmt.where(Proposal.domain == domain)
         if status:
             stmt = stmt.where(Proposal.status == status)
+        if completeness_status:
+            stmt = stmt.where(Proposal.completeness_status == completeness_status)
+        if compliance_status:
+            stmt = stmt.where(Proposal.compliance_status == compliance_status)
+
+        if search:
+            q = f"%{search}%"
+            stmt = stmt.where(
+                or_(
+                    Proposal.title.ilike(q),
+                    Proposal.proposal_reference.ilike(q),
+                    Proposal.principal_investigator.ilike(q),
+                    Proposal.domain.ilike(q),
+                )
+            )
+
         return list(self.db.scalars(stmt).all())
 
     def get_by_id(self, proposal_id: str) -> Proposal | None:
@@ -30,10 +54,11 @@ class ProposalRepository:
             problem_statement=data.problem_statement,
             objectives=data.objectives,
             methodology=data.methodology,
+            technology=data.technology,
             literature_review=data.literature_review,
             expected_outcomes=data.expected_outcomes,
             timeline=data.timeline,
-            status=data.status,
+            duration_months=data.duration_months,
             priority=data.priority,
             budget_total=data.budget_total,
         )

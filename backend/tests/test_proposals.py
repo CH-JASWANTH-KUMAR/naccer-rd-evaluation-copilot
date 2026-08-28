@@ -61,7 +61,7 @@ def test_create_proposal_invalid_institution(client: TestClient):
     }
     res = client.post("/api/v1/proposals", json=payload)
     assert res.status_code == 404
-    assert "does not exist" in res.json()["detail"]
+    assert "not found" in res.json()["detail"].lower()
 
 
 def test_create_proposal_negative_budget(client: TestClient):

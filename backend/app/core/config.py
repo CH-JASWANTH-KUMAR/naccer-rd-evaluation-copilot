@@ -16,6 +16,16 @@ class Settings(BaseSettings):
     # CORS Origins Configuration
     CORS_ORIGINS: list[str] | str = ["http://localhost:3000", "http://127.0.0.1:3000"]
 
+    # AI & RAG Configuration (Phase P0.8)
+    AI_PROVIDER: str = "deterministic"
+    AI_MODEL: str = "gemini-2.5-flash"
+    AI_API_KEY: str | None = None
+    GEMINI_API_KEY: str | None = None
+    OPENAI_API_KEY: str | None = None
+    AI_TEMPERATURE: float = 0.2
+    AI_MAX_TOKENS: int = 2048
+    RAG_TOP_K_HISTORICAL: int = 5
+
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def assemble_cors_origins(cls, v: str | list[str]) -> list[str]:

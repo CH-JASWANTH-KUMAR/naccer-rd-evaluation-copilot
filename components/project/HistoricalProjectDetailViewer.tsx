@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
-import { ExternalLink, CheckCircle2, ShieldAlert, FileText, ChevronDown, ChevronUp, Loader2 } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import Link from "next/link";
+import { ExternalLink, CheckCircle2, ShieldAlert, FileText, ChevronDown, ChevronUp, Loader2, Sparkles, AlertCircle, ArrowRight } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { HistoricalProject } from "@/lib/types";
-import { projectService } from "@/lib/api/projects";
+import { projectService, SimilarityResultItem } from "@/lib/api/projects";
 import { formatCurrency } from "@/lib/utils";
 
 interface HistoricalProjectDetailViewerProps {
@@ -17,6 +18,36 @@ export function HistoricalProjectDetailViewer({ initialProject }: HistoricalProj
   const [project, setProject] = useState<HistoricalProject>(initialProject);
   const [updating, setUpdating] = useState(false);
   const [showRawText, setShowRawText] = useState(false);
+
+  // Related Projects Benchmarking State
+  const [relatedProjects, setRelatedProjects] = useState<SimilarityResultItem[]>([]);
+  const [loadingRelated, setLoadingRelated] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    projectService
+      .searchSimilarProjects({
+        title: project.title,
+        objectives: project.summary,
+        domain: project.domain,
+        topK: 4,
+      })
+      .then((res) => {
+        if (isMounted) {
+          // Filter out current project from related list
+          const filtered = (res.results || []).filter((r) => r.projectId !== project.id);
+          setRelatedProjects(filtered);
+          setLoadingRelated(false);
+        }
+      })
+      .catch(() => {
+        if (isMounted) setLoadingRelated(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [project.id, project.title, project.summary, project.domain]);
 
   const handleVerification = async (newStatus: "VERIFIED" | "REJECTED" | "NEEDS_REVIEW") => {
     setUpdating(true);
@@ -217,6 +248,73 @@ export function HistoricalProjectDetailViewer({ initialProject }: HistoricalProj
           </CardContent>
         </Card>
       </div>
+
+      {/* Related Historical Projects Benchmarking Section */}
+      <Card>
+        <CardHeader className="pb-3 border-b border-slate-200">
+          <CardTitle className="text-sm flex items-center space-x-2">
+            <Sparkles className="h-4 w-4 text-blue-600" />
+            <span>Related Historical R&amp;D Projects in Database</span>
+          </CardTitle>
+          <CardDescription className="text-xs">
+            Potentially related CIL/CMPDI historical projects surfaced by the similarity engine for reviewer evidence comparison.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-4 space-y-4">
+          {/* Reviewer Disclaimer */}
+          <div className="p-2.5 bg-amber-50 border border-amber-200 rounded text-xs text-amber-900 flex items-center space-x-2">
+            <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0" />
+            <span>
+              <strong>Reviewer Disclaimer:</strong> Similarity results are evidence for reviewer assessment and do not constitute an automated decision.
+            </span>
+          </div>
+
+          {loadingRelated ? (
+            <div className="p-6 flex items-center justify-center space-x-2 text-xs text-slate-500">
+              <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+              <span>Surfacing related historical benchmark projects...</span>
+            </div>
+          ) : relatedProjects.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {relatedProjects.map((rel) => (
+                <div key={rel.projectId} className="p-4 bg-slate-50 border border-slate-200 rounded-md space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <Badge variant="outline" className="font-mono text-[10px]">
+                      {rel.projectCode}
+                    </Badge>
+                    <Badge variant="success" className="text-[10px]">
+                      {rel.similarityPercentage}% Similarity
+                    </Badge>
+                  </div>
+
+                  <Link href={`/projects/${rel.projectId}`} className="font-bold text-slate-900 hover:underline block line-clamp-1">
+                    {rel.projectTitle}
+                  </Link>
+
+                  <p className="text-slate-600 text-[11px] line-clamp-2">{rel.summary}</p>
+
+                  {rel.evidence.length > 0 && (
+                    <p className="text-slate-700 text-[11px] font-mono bg-white p-1.5 rounded border border-slate-200">
+                      Reason: {rel.evidence[0].reason}
+                    </p>
+                  )}
+
+                  <div className="flex items-center justify-between pt-1 text-[11px] text-slate-500">
+                    <span>Page: {rel.provenance.sourcePageStart}</span>
+                    <Link href={`/projects/${rel.projectId}`} className="text-blue-600 hover:underline flex items-center">
+                      View Details <ArrowRight className="h-3 w-3 ml-1" />
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="p-4 text-center text-xs text-slate-500">
+              No other related historical projects found for this record.
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

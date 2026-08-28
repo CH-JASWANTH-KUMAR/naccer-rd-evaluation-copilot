@@ -5,7 +5,10 @@ export type ProposalStatus =
   | "AWAITING_REVIEW"
   | "POTENTIAL_ISSUES"
   | "COMPLETED"
-  | "REJECTED";
+  | "REJECTED"
+  | "READY_FOR_REVIEW"
+  | "INCOMPLETE"
+  | "UPLOADED";
 
 export type ProposalPriority = "HIGH" | "MEDIUM" | "LOW";
 
@@ -19,16 +22,28 @@ export interface Institution {
 
 export interface Proposal {
   id: string;
+  proposalReference?: string;
   title: string;
   institution: Institution;
   domain: string;
   principalInvestigator: string;
   submittedDate: string;
+  submissionDate?: string;
   status: ProposalStatus;
   priority: ProposalPriority;
   proposedBudget: number;
+  budgetTotal?: number;
   durationMonths: number;
   summary: string;
+  problemStatement?: string;
+  objectives?: string;
+  methodology?: string;
+  technology?: string;
+  expectedOutcomes?: string;
+  completenessStatus?: "COMPLETE" | "INCOMPLETE";
+  complianceStatus?: "COMPLIANT" | "FLAGGED" | "NEEDS_JUSTIFICATION";
+  processingStatus?: string;
+  processingError?: string;
   documentUrl?: string;
   keywords: string[];
 }

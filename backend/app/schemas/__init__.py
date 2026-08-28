@@ -1,9 +1,30 @@
+from app.schemas.ai_analysis import (
+    AIAnalysisRead,
+    AIAnalysisResult,
+    ConcernItem,
+    ContradictionItem,
+    CriterionAnalysisItem,
+    EvidenceGapItem,
+    EvidenceReference,
+    ReviewerQuestionItem,
+    StrengthItem,
+)
 from app.schemas.common import HealthResponse, ORMBase
 from app.schemas.document import (
     DocumentDetailRead,
     DocumentPageRead,
     DocumentRead,
     ProposalSectionRead,
+)
+from app.schemas.evaluation import (
+    EvaluationAuditEventRead,
+    EvaluationCreate,
+    EvaluationCriterionRead,
+    EvaluationCriterionUpdate,
+    EvaluationEvidenceCreate,
+    EvaluationEvidenceRead,
+    EvaluationRead,
+    EvaluationUpdate,
 )
 from app.schemas.institution import InstitutionCreate, InstitutionRead, InstitutionUpdate
 from app.schemas.project import (
@@ -14,7 +35,22 @@ from app.schemas.project import (
     ImportReportRead,
     VerificationUpdate,
 )
-from app.schemas.proposal import ProposalCreate, ProposalRead, ProposalUpdate
+from app.schemas.proposal import (
+    CompletenessFindingRead,
+    FinancialComplianceReportRead,
+    ProposalCompletenessReportRead,
+    ProposalCreate,
+    ProposalRead,
+    ProposalUpdate,
+)
+from app.schemas.rubric import EvaluationRubricRead, RubricCriterionRead
+from app.schemas.search import (
+    EvidenceItemRead,
+    ProvenanceRead,
+    SimilarityResultItem,
+    SimilaritySearchRequest,
+    SimilaritySearchResponse,
+)
 
 __all__ = [
     "HealthResponse",
@@ -25,6 +61,9 @@ __all__ = [
     "ProposalCreate",
     "ProposalRead",
     "ProposalUpdate",
+    "ProposalCompletenessReportRead",
+    "FinancialComplianceReportRead",
+    "CompletenessFindingRead",
     "HistoricalProjectCreate",
     "HistoricalProjectRead",
     "HistoricalSourceDocumentRead",
@@ -35,4 +74,28 @@ __all__ = [
     "DocumentDetailRead",
     "DocumentPageRead",
     "ProposalSectionRead",
+    "SimilaritySearchRequest",
+    "SimilaritySearchResponse",
+    "SimilarityResultItem",
+    "EvidenceItemRead",
+    "ProvenanceRead",
+    "EvaluationRubricRead",
+    "RubricCriterionRead",
+    "EvaluationRead",
+    "EvaluationCreate",
+    "EvaluationUpdate",
+    "EvaluationCriterionRead",
+    "EvaluationCriterionUpdate",
+    "EvaluationEvidenceRead",
+    "EvaluationEvidenceCreate",
+    "EvaluationAuditEventRead",
+    "EvidenceReference",
+    "CriterionAnalysisItem",
+    "StrengthItem",
+    "ConcernItem",
+    "EvidenceGapItem",
+    "ReviewerQuestionItem",
+    "ContradictionItem",
+    "AIAnalysisResult",
+    "AIAnalysisRead",
 ]

@@ -2,7 +2,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, Float, ForeignKey, String, Text
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -22,6 +22,9 @@ class Proposal(Base):
     __tablename__ = "proposals"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    proposal_reference: Mapped[str] = mapped_column(
+        String(100), nullable=False, unique=False, index=True, default=lambda: f"PR-2026-{uuid.uuid4().hex[:6].upper()}"
+    )
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     institution_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("institutions.id", ondelete="CASCADE"), nullable=False
@@ -32,14 +35,22 @@ class Proposal(Base):
     problem_statement: Mapped[str | None] = mapped_column(Text, nullable=True)
     objectives: Mapped[str | None] = mapped_column(Text, nullable=True)
     methodology: Mapped[str | None] = mapped_column(Text, nullable=True)
+    technology: Mapped[str | None] = mapped_column(Text, nullable=True)
     literature_review: Mapped[str | None] = mapped_column(Text, nullable=True)
     expected_outcomes: Mapped[str | None] = mapped_column(Text, nullable=True)
     timeline: Mapped[str | None] = mapped_column(Text, nullable=True)
+    duration_months: Mapped[int | None] = mapped_column(Integer, nullable=True, default=12)
 
     status: Mapped[str] = mapped_column(String(50), nullable=False, default="UNDER_REVIEW")
     priority: Mapped[str] = mapped_column(String(50), nullable=False, default="MEDIUM")
     budget_total: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     submission_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+
+    # Processing & Scrutiny Engine Fields
+    completeness_status: Mapped[str] = mapped_column(String(50), nullable=False, default="INCOMPLETE")
+    compliance_status: Mapped[str] = mapped_column(String(50), nullable=False, default="COMPLIANT")
+    processing_status: Mapped[str] = mapped_column(String(50), nullable=False, default="UPLOADED")
+    processing_error: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
     updated_at: Mapped[datetime] = mapped_column(

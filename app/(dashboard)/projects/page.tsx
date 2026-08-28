@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { Search, Database, Loader2 } from "lucide-react";
+import { Search, Database, Sparkles, Loader2 } from "lucide-react";
 import { projectService } from "@/lib/api/projects";
 import { HistoricalProject } from "@/lib/types";
 import { Input } from "@/components/ui/input";
@@ -13,8 +13,11 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@
 import { Card, CardContent } from "@/components/ui/card";
 import { RESEARCH_DOMAINS } from "@/lib/constants";
 import { formatCurrency } from "@/lib/utils";
+import { SimilaritySearchWorkspace } from "@/components/project/SimilaritySearchWorkspace";
 
 export default function HistoricalProjectsPage() {
+  const [activeTab, setActiveTab] = useState<"directory" | "similarity">("directory");
+
   const [projects, setProjects] = useState<HistoricalProject[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -25,7 +28,7 @@ export default function HistoricalProjectsPage() {
   const [sourceType, setSourceType] = useState("");
   const [verificationStatus, setVerificationStatus] = useState("");
 
-  const fetchProjects = () => {
+  const fetchProjects = useCallback(() => {
     setLoading(true);
     projectService
       .getHistoricalProjects({
@@ -42,7 +45,7 @@ export default function HistoricalProjectsPage() {
       .catch(() => {
         setLoading(false);
       });
-  };
+  }, [search, domain, status, sourceType, verificationStatus]);
 
   useEffect(() => {
     let isMounted = true;
@@ -78,7 +81,7 @@ export default function HistoricalProjectsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Page Title */}
+      {/* Page Title & Navigation Tabs */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-200 pb-5">
         <div>
           <h1 className="text-xl font-bold text-slate-900 tracking-tight flex items-center space-x-2">
@@ -86,158 +89,188 @@ export default function HistoricalProjectsPage() {
             <span>Historical R&amp;D Project Knowledge Base</span>
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Official CIL / CMPDI historical catalogue records &amp; benchmark evidence repository.
+            Official CIL / CMPDI historical catalogue records &amp; evidence-backed similarity engine.
           </p>
+        </div>
+
+        {/* Tab Selector */}
+        <div className="flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200">
+          <button
+            type="button"
+            onClick={() => setActiveTab("directory")}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors flex items-center space-x-1.5 ${
+              activeTab === "directory" ? "bg-white text-slate-900 shadow-xs" : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            <Database className="h-3.5 w-3.5" />
+            <span>Project Directory</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("similarity")}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors flex items-center space-x-1.5 ${
+              activeTab === "similarity" ? "bg-white text-blue-600 shadow-xs" : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            <Sparkles className="h-3.5 w-3.5 text-blue-600" />
+            <span>Find Similar Projects</span>
+          </button>
         </div>
       </div>
 
-      {/* Filter Bar */}
-      <form onSubmit={handleSearchSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 bg-white p-4 rounded-lg border border-slate-200 shadow-xs">
-        <div className="relative lg:col-span-1">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search code, title..."
-            className="pl-9 text-xs"
-          />
-        </div>
-
-        <div>
-          <Select value={domain} onChange={(e) => setDomain(e.target.value)} className="text-xs">
-            <option value="">All Research Domains</option>
-            {RESEARCH_DOMAINS.map((d) => (
-              <option key={d} value={d}>
-                {d}
-              </option>
-            ))}
-          </Select>
-        </div>
-
-        <div>
-          <Select value={status} onChange={(e) => setStatus(e.target.value)} className="text-xs">
-            <option value="">All Statuses</option>
-            <option value="ONGOING">Ongoing</option>
-            <option value="COMPLETED">Completed</option>
-            <option value="TERMINATED">Terminated</option>
-          </Select>
-        </div>
-
-        <div>
-          <Select value={sourceType} onChange={(e) => setSourceType(e.target.value)} className="text-xs">
-            <option value="">All Sources</option>
-            <option value="OFFICIAL">Official CIL/CMPDI</option>
-            <option value="SYNTHETIC">Synthetic Demo</option>
-          </Select>
-        </div>
-
-        <div>
-          <Select value={verificationStatus} onChange={(e) => setVerificationStatus(e.target.value)} className="text-xs">
-            <option value="">All Verification</option>
-            <option value="NEEDS_REVIEW">Needs Review</option>
-            <option value="VERIFIED">Verified</option>
-            <option value="REJECTED">Rejected</option>
-          </Select>
-        </div>
-
-        <div>
-          <Button type="submit" size="sm" className="w-full h-9">
-            Search
-          </Button>
-        </div>
-      </form>
-
-      {/* Projects Directory Table */}
-      <Card>
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="p-8 flex items-center justify-center space-x-2 text-xs text-slate-500">
-              <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
-              <span>Querying historical project records...</span>
+      {activeTab === "similarity" ? (
+        <SimilaritySearchWorkspace />
+      ) : (
+        <div className="space-y-6">
+          {/* Filter Bar */}
+          <form onSubmit={handleSearchSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 bg-white p-4 rounded-lg border border-slate-200 shadow-xs">
+            <div className="relative lg:col-span-1">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search code, title..."
+                className="pl-9 text-xs"
+              />
             </div>
-          ) : projects.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>PROJECT CODE &amp; TITLE</TableHead>
-                  <TableHead>INSTITUTION</TableHead>
-                  <TableHead>SOURCE</TableHead>
-                  <TableHead>COST</TableHead>
-                  <TableHead>STATUS</TableHead>
-                  <TableHead>VERIFICATION</TableHead>
-                  <TableHead className="text-right">ACTION</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {projects.map((proj) => (
-                  <TableRow key={proj.id}>
-                    <TableCell className="font-medium text-slate-900">
-                      <div className="max-w-md space-y-1">
-                        <div className="flex items-center space-x-2">
-                          <Badge variant="outline" className="font-mono text-[10px]">
-                            {proj.projectCode || proj.id}
-                          </Badge>
-                          <span className="text-[10px] text-slate-500 font-mono">{proj.domain}</span>
-                        </div>
-                        <Link
-                          href={`/projects/${proj.id}`}
-                          className="font-semibold text-slate-900 hover:underline line-clamp-2 text-xs"
-                        >
-                          {proj.title}
-                        </Link>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <span className="font-semibold text-slate-800 text-xs">{proj.institution.name}</span>
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={proj.sourceType === "OFFICIAL" ? "success" : "secondary"}
-                        className="text-[10px]"
-                      >
-                        {proj.sourceType === "OFFICIAL" ? "OFFICIAL (CIL/CMPDI)" : "DEMO / SYNTHETIC"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="font-mono text-xs font-semibold text-slate-800">
-                      {proj.approvedCostRaw ? proj.approvedCostRaw : formatCurrency(proj.totalCost)}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="text-[10px]">
-                        {proj.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={
-                          proj.verificationStatus === "VERIFIED"
-                            ? "info"
-                            : proj.verificationStatus === "REJECTED"
-                            ? "danger"
-                            : "warning"
-                        }
-                        className="text-[10px]"
-                      >
-                        {proj.verificationStatus.replace("_", " ")}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Link href={`/projects/${proj.id}`}>
-                        <Button variant="outline" size="sm" className="h-7 text-xs">
-                          View Details &amp; Provenance
-                        </Button>
-                      </Link>
-                    </TableCell>
-                  </TableRow>
+
+            <div>
+              <Select value={domain} onChange={(e) => setDomain(e.target.value)} className="text-xs">
+                <option value="">All Research Domains</option>
+                {RESEARCH_DOMAINS.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
                 ))}
-              </TableBody>
-            </Table>
-          ) : (
-            <div className="p-8 text-center text-xs text-slate-500">
-              No historical project records match the current search or filter criteria.
+              </Select>
             </div>
-          )}
-        </CardContent>
-      </Card>
+
+            <div>
+              <Select value={status} onChange={(e) => setStatus(e.target.value)} className="text-xs">
+                <option value="">All Statuses</option>
+                <option value="ONGOING">Ongoing</option>
+                <option value="COMPLETED">Completed</option>
+                <option value="TERMINATED">Terminated</option>
+              </Select>
+            </div>
+
+            <div>
+              <Select value={sourceType} onChange={(e) => setSourceType(e.target.value)} className="text-xs">
+                <option value="">All Sources</option>
+                <option value="OFFICIAL">Official CIL/CMPDI</option>
+                <option value="SYNTHETIC">Synthetic Demo</option>
+              </Select>
+            </div>
+
+            <div>
+              <Select value={verificationStatus} onChange={(e) => setVerificationStatus(e.target.value)} className="text-xs">
+                <option value="">All Verification</option>
+                <option value="NEEDS_REVIEW">Needs Review</option>
+                <option value="VERIFIED">Verified</option>
+                <option value="REJECTED">Rejected</option>
+              </Select>
+            </div>
+
+            <div>
+              <Button type="submit" size="sm" className="w-full h-9">
+                Search
+              </Button>
+            </div>
+          </form>
+
+          {/* Projects Directory Table */}
+          <Card>
+            <CardContent className="p-0">
+              {loading ? (
+                <div className="p-8 flex items-center justify-center space-x-2 text-xs text-slate-500">
+                  <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                  <span>Querying historical project records...</span>
+                </div>
+              ) : projects.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>PROJECT CODE &amp; TITLE</TableHead>
+                      <TableHead>INSTITUTION</TableHead>
+                      <TableHead>SOURCE</TableHead>
+                      <TableHead>COST</TableHead>
+                      <TableHead>STATUS</TableHead>
+                      <TableHead>VERIFICATION</TableHead>
+                      <TableHead className="text-right">ACTION</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {projects.map((proj) => (
+                      <TableRow key={proj.id}>
+                        <TableCell className="font-medium text-slate-900">
+                          <div className="max-w-md space-y-1">
+                            <div className="flex items-center space-x-2">
+                              <Badge variant="outline" className="font-mono text-[10px]">
+                                {proj.projectCode || proj.id}
+                              </Badge>
+                              <span className="text-[10px] text-slate-500 font-mono">{proj.domain}</span>
+                            </div>
+                            <Link
+                              href={`/projects/${proj.id}`}
+                              className="font-semibold text-slate-900 hover:underline line-clamp-2 text-xs"
+                            >
+                              {proj.title}
+                            </Link>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className="font-semibold text-slate-800 text-xs">{proj.institution.name}</span>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={proj.sourceType === "OFFICIAL" ? "success" : "secondary"}
+                            className="text-[10px]"
+                          >
+                            {proj.sourceType === "OFFICIAL" ? "OFFICIAL (CIL/CMPDI)" : "DEMO / SYNTHETIC"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="font-mono text-xs font-semibold text-slate-800">
+                          {proj.approvedCostRaw ? proj.approvedCostRaw : formatCurrency(proj.totalCost)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-[10px]">
+                            {proj.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={
+                              proj.verificationStatus === "VERIFIED"
+                                ? "info"
+                                : proj.verificationStatus === "REJECTED"
+                                ? "danger"
+                                : "warning"
+                            }
+                            className="text-[10px]"
+                          >
+                            {proj.verificationStatus.replace("_", " ")}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Link href={`/projects/${proj.id}`}>
+                            <Button variant="outline" size="sm" className="h-7 text-xs">
+                              View Details &amp; Provenance
+                            </Button>
+                          </Link>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="p-8 text-center text-xs text-slate-500">
+                  No historical project records match the current search or filter criteria.
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

@@ -10,7 +10,9 @@ from app.schemas.project import (
     ImportReportRead,
     VerificationUpdate,
 )
+from app.schemas.search import SimilaritySearchRequest, SimilaritySearchResponse
 from app.services.historical_import_service import HistoricalProjectImportService
+from app.services.historical_search_service import HistoricalProjectSearchService
 from app.services.projects import HistoricalProjectService
 
 router = APIRouter()
@@ -59,6 +61,57 @@ def get_import_batch_details(import_id: str, db: Session = Depends(get_db)):
             detail=f"Import batch with ID '{import_id}' not found.",
         )
     return ImportBatchRead.model_validate(batch)
+
+
+@router.post(
+    "/projects/search/similar",
+    response_model=SimilaritySearchResponse,
+    summary="Search similar historical projects with evidence & provenance",
+)
+def search_similar_historical_projects(
+    payload: SimilaritySearchRequest,
+    db: Session = Depends(get_db),
+):
+    """Evidence-backed historical project similarity search engine."""
+    search_service = HistoricalProjectSearchService(db)
+    return search_service.search_similar_projects(payload)
+
+
+@router.get(
+    "/projects/search",
+    response_model=list[HistoricalProjectRead],
+    summary="Structured keyword & filter search",
+)
+def search_projects_get(
+    search: str | None = Query(None, description="Search term in title, code, domain, or institution"),
+    domain: str | None = Query(None, description="Filter by domain"),
+    institution: str | None = Query(None, description="Filter by institution"),
+    status: str | None = Query(None, description="Filter by status"),
+    source_type: str | None = Query(None, description="Filter by source type"),
+    verification_status: str | None = Query(None, description="Filter by verification status"),
+    db: Session = Depends(get_db),
+):
+    """Retrieve historical projects using keyword search and structured filters."""
+    service = HistoricalProjectService(db)
+    return service.get_all(
+        domain=domain,
+        status_filter=status,
+        institution=institution,
+        source_type=source_type,
+        verification_status=verification_status,
+        search=search,
+    )
+
+
+@router.post(
+    "/projects/embeddings/index",
+    summary="Pre-compute and index embeddings for all historical projects",
+)
+def index_project_embeddings(db: Session = Depends(get_db)):
+    """Admin endpoint to pre-compute and store project embeddings."""
+    search_service = HistoricalProjectSearchService(db)
+    count = search_service.reindex_all_embeddings()
+    return {"message": f"Successfully indexed embeddings for {count} historical projects."}
 
 
 @router.get("/projects", response_model=list[HistoricalProjectRead], summary="List historical projects")

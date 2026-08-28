@@ -8,6 +8,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 
 if TYPE_CHECKING:
+    from app.models.historical_project_embedding import HistoricalProjectEmbedding
     from app.models.import_batch import ImportBatch
 
 
@@ -56,3 +57,6 @@ class HistoricalProject(Base):
 
     # Relationships
     import_batch: Mapped["ImportBatch | None"] = relationship("ImportBatch", back_populates="historical_projects")
+    embeddings: Mapped[list["HistoricalProjectEmbedding"]] = relationship(
+        "HistoricalProjectEmbedding", back_populates="historical_project", cascade="all, delete-orphan"
+    )

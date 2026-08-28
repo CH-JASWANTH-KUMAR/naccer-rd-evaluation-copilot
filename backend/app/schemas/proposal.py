@@ -1,44 +1,77 @@
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from app.schemas.common import ORMBase
 from app.schemas.institution import InstitutionRead
 
 
-class ProposalCreate(BaseModel):
-    title: str = Field(..., min_length=3, max_length=500)
-    institution_id: str = Field(..., min_length=1)
-    principal_investigator: str = Field(..., min_length=2, max_length=255)
-    domain: str = Field(..., min_length=2, max_length=255)
+class CompletenessFindingRead(ORMBase):
+    field: str
+    severity: str = Field(description="ERROR, WARNING, or INFO")
+    message: str
 
+
+class ProposalCompletenessReportRead(ORMBase):
+    proposal_id: str
+    status: str = Field(description="COMPLETE or INCOMPLETE")
+    missing_fields: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    findings: list[CompletenessFindingRead] = Field(default_factory=list)
+
+
+class FinancialHeadBreakdownRead(ORMBase):
+    cost_head: str
+    amount: float
+    notes: str | None = None
+
+
+class FinancialComplianceReportRead(ORMBase):
+    proposal_id: str
+    status: str = Field(description="COMPLIANT, FLAGGED, or NEEDS_JUSTIFICATION")
+    declared_total: float
+    calculated_total: float
+    arithmetic_mismatch: bool
+    difference_amount: float
+    findings: list[dict] = Field(default_factory=list)
+
+
+class ProposalCreate(ORMBase):
+    title: str
+    institution_id: str
+    principal_investigator: str
+    domain: str
     problem_statement: str | None = None
     objectives: str | None = None
     methodology: str | None = None
+    technology: str | None = None
     literature_review: str | None = None
     expected_outcomes: str | None = None
     timeline: str | None = None
+    duration_months: int | None = 12
+    status: str = "UNDER_REVIEW"
+    priority: str = "MEDIUM"
+    budget_total: float = 0.0
 
-    status: str = Field(default="UNDER_REVIEW")
-    priority: str = Field(default="MEDIUM")
-    budget_total: float = Field(default=0.0, ge=0.0)
 
-
-class ProposalUpdate(BaseModel):
+class ProposalUpdate(ORMBase):
     title: str | None = None
     principal_investigator: str | None = None
     domain: str | None = None
     problem_statement: str | None = None
     objectives: str | None = None
     methodology: str | None = None
+    technology: str | None = None
     expected_outcomes: str | None = None
+    duration_months: int | None = None
     status: str | None = None
     priority: str | None = None
-    budget_total: float | None = Field(default=None, ge=0.0)
+    budget_total: float | None = None
 
 
 class ProposalRead(ORMBase):
     id: str
+    proposal_reference: str
     title: str
     institution_id: str
     institution: InstitutionRead | None = None
@@ -47,10 +80,18 @@ class ProposalRead(ORMBase):
     problem_statement: str | None = None
     objectives: str | None = None
     methodology: str | None = None
+    technology: str | None = None
+    literature_review: str | None = None
     expected_outcomes: str | None = None
+    timeline: str | None = None
+    duration_months: int | None = 12
     status: str
     priority: str
     budget_total: float
+    completeness_status: str
+    compliance_status: str
+    processing_status: str
+    processing_error: str | None = None
     submission_date: datetime
     created_at: datetime
     updated_at: datetime

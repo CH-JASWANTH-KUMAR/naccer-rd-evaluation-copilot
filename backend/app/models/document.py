@@ -21,6 +21,8 @@ class Document(Base):
     filename: Mapped[str] = mapped_column(String(255), nullable=False)
     file_type: Mapped[str] = mapped_column(String(50), nullable=False, default="application/pdf")
     file_size: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    document_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    page_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     storage_path: Mapped[str] = mapped_column(String(500), nullable=False)
     processing_status: Mapped[str] = mapped_column(String(50), nullable=False, default="UPLOADED")
     processing_error: Mapped[str | None] = mapped_column(String(1000), nullable=True)
