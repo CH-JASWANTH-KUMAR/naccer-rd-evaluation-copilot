@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.repositories.institutions import InstitutionRepository
 from app.repositories.proposals import ProposalRepository
+from app.schemas.evidence_readiness import EvidenceReadinessScoreResponse
 from app.schemas.proposal import (
     FinancialComplianceReportRead,
     ProposalCompletenessReportRead,
@@ -13,6 +14,7 @@ from app.schemas.proposal import (
 )
 from app.schemas.proposal_scientific_comparison import ProposalScientificComparisonResponse
 from app.schemas.search import SimilaritySearchRequest, SimilaritySearchResponse
+from app.services.evidence_readiness_service import EvidenceReadinessService
 from app.services.financial_compliance import FinancialComplianceService
 from app.services.historical_search_service import HistoricalProjectSearchService
 from app.services.proposal_completeness import ProposalCompletenessService
@@ -200,6 +202,17 @@ def get_proposal_financial_compliance_report(proposal_id: str, db: Session = Dep
             detail=f"Proposal with ID '{proposal_id}' not found.",
         )
     return FinancialComplianceService.evaluate_financial_compliance(proposal)
+
+
+@router.get(
+    "/{proposal_id}/evidence-readiness",
+    response_model=EvidenceReadinessScoreResponse,
+    summary="Get transparent Evidence Readiness Score for proposal",
+)
+def get_proposal_evidence_readiness(proposal_id: str, db: Session = Depends(get_db)):
+    """Retrieve transparent 0-100 Evidence Readiness Score summarizing evidence coverage."""
+    service = EvidenceReadinessService(db)
+    return service.calculate_evidence_readiness(proposal_id)
 
 
 @router.post("/{proposal_id}/reprocess", response_model=ProposalRead, summary="Reprocess proposal scrutiny")

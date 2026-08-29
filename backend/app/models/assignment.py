@@ -2,7 +2,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, ForeignKey, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -20,6 +20,10 @@ class EvaluationAssignment(Base):
     )
     reviewer_id: Mapped[str] = mapped_column(String(255), nullable=False)
     assigned_by: Mapped[str] = mapped_column(String(255), nullable=False, default="Admin")
+
+    task_title: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    priority: Mapped[str | None] = mapped_column(String(50), nullable=True, default="MEDIUM")
+    is_demo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     status: Mapped[str] = mapped_column(String(50), nullable=False, default="ASSIGNED")
     assigned_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))

@@ -17,7 +17,8 @@ interface ReviewerWorkspaceViewProps {
   reviewerId: string;
 }
 
-export function ReviewerWorkspaceView({ reviewerId }: ReviewerWorkspaceViewProps) {
+export function ReviewerWorkspaceView({ reviewerId: initialReviewerId }: ReviewerWorkspaceViewProps) {
+  const [reviewerId, setReviewerId] = useState(initialReviewerId || "Reviewer A (Technical)");
   const [queue, setQueue] = useState<ReviewerWorkspaceQueue | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -70,15 +71,24 @@ export function ReviewerWorkspaceView({ reviewerId }: ReviewerWorkspaceViewProps
   return (
     <div className="space-y-6">
       {/* HEADER BAR */}
-      <div className="flex items-center justify-between pb-4 border-b">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b gap-4">
         <div>
           <h1 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
             <UserCheck className="h-5 w-5 text-blue-600" />
             <span>Reviewer Workspace Queue</span>
           </h1>
-          <p className="text-xs text-slate-500 font-mono mt-0.5">
-            Reviewer ID: <span className="font-bold text-slate-800">{reviewerId}</span>
-          </p>
+          <div className="flex items-center space-x-2 mt-1">
+            <span className="text-xs text-slate-500 font-mono">Active Reviewer Persona:</span>
+            <select
+              value={reviewerId}
+              onChange={(e) => setReviewerId(e.target.value)}
+              className="text-xs font-mono font-bold bg-slate-100 border border-slate-300 rounded px-2 py-1 text-slate-900"
+            >
+              <option value="Reviewer A (Technical)">Reviewer A — Technical Evaluation</option>
+              <option value="Reviewer B (Scientific)">Reviewer B — Scientific/Research Evaluation</option>
+              <option value="Reviewer C (Financial)">Reviewer C — Financial & Implementation Evaluation</option>
+            </select>
+          </div>
         </div>
 
         {/* TABS SELECTOR */}
@@ -89,7 +99,7 @@ export function ReviewerWorkspaceView({ reviewerId }: ReviewerWorkspaceViewProps
               activeTab === "pending" ? "bg-white shadow text-slate-900 font-bold" : "text-slate-600 hover:text-slate-900"
             }`}
           >
-            Pending ({queue.pendingReviews.length})
+            Pending Tasks ({queue.pendingReviews.length})
           </button>
           <button
             onClick={() => setActiveTab("completed")}
@@ -115,7 +125,7 @@ export function ReviewerWorkspaceView({ reviewerId }: ReviewerWorkspaceViewProps
       {/* CARDS LIST */}
       {currentCards.length === 0 ? (
         <div className="p-12 text-center text-xs text-slate-500 border border-dashed rounded-lg bg-slate-50">
-          No proposals found in {activeTab} reviews queue.
+          No review tasks found in {activeTab} queue.
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -133,12 +143,25 @@ function ReviewerProposalCard({ card }: { card: ReviewerAssignedProposalCard }) 
     <Card className="border-slate-200 hover:border-blue-300 transition-all shadow-sm">
       <CardHeader className="py-3 bg-slate-50/70 border-b border-slate-200 flex flex-row items-start justify-between space-y-0">
         <div>
-          <Badge variant="outline" className="font-mono text-[10px] uppercase mb-1">
-            {card.proposalReference}
-          </Badge>
+          <div className="flex items-center space-x-1.5 mb-1">
+            <Badge variant="outline" className="font-mono text-[10px] uppercase">
+              {card.proposalReference}
+            </Badge>
+            {card.isDemo && (
+              <Badge variant="outline" className="bg-amber-100 text-amber-900 border-amber-300 text-[9px] font-mono uppercase font-bold">
+                DEMO DATA
+              </Badge>
+            )}
+            <Badge
+              variant={card.priority === "HIGH" ? "danger" : "warning"}
+              className="text-[9px] font-mono uppercase px-1.5"
+            >
+              Priority: {card.priority || "MEDIUM"}
+            </Badge>
+          </div>
           <CardTitle className="text-sm font-bold text-slate-900 line-clamp-1">{card.proposalTitle}</CardTitle>
-          <CardDescription className="text-xs text-slate-500 font-mono">
-            {card.institution} &bull; {card.domain}
+          <CardDescription className="text-xs text-slate-700 font-mono font-semibold mt-0.5">
+            Task: {card.taskTitle || "Review Proposal"}
           </CardDescription>
         </div>
         <Badge
@@ -165,9 +188,9 @@ function ReviewerProposalCard({ card }: { card: ReviewerAssignedProposalCard }) 
           </div>
 
           <div>
-            <span className="text-slate-400 text-[10px] block">SCIENTIFIC EVIDENCE</span>
+            <span className="text-slate-400 text-[10px] block">EVIDENCE SOURCES</span>
             <span className="font-semibold text-slate-800">
-              {card.scientificComparisonAvailable ? "READY" : "NOT READY"} ({card.evidenceGapsCount} gaps)
+              {card.evidenceSourcesCount || 6} sources ({card.evidenceGapsCount} gaps)
             </span>
           </div>
 

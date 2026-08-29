@@ -10,6 +10,10 @@ class ReviewerAssignedProposalCard(BaseModel):
     proposal_title: str
     institution: str | None = None
     domain: str | None = None
+    task_title: str | None = None
+    priority: str | None = "MEDIUM"
+    is_demo: bool = False
+    evidence_sources_count: int = 6
     review_status: str
     assignment_date: str
     due_date: str | None = None

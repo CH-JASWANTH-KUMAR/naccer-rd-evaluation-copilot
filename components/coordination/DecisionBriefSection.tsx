@@ -19,6 +19,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { coordinationService, DecisionBriefResponse } from "@/lib/api/coordination";
+import { EvidenceReadinessCard } from "@/components/coordination/EvidenceReadinessCard";
 import { formatCurrency } from "@/lib/utils";
 
 interface DecisionBriefSectionProps {
@@ -73,6 +74,9 @@ export function DecisionBriefSection({ proposalId, reviewerId, userRole = "ADMIN
 
   return (
     <div className="space-y-6">
+      {/* 0. TRANSPARENT EVIDENCE READINESS SCORE (STEP 9) */}
+      <EvidenceReadinessCard proposalId={proposalId} />
+
       {/* HEADER BANNER */}
       <div
         className={`p-4 rounded-lg border text-xs space-y-2 ${

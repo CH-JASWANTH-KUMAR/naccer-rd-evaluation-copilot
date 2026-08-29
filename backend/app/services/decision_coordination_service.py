@@ -53,6 +53,20 @@ class DecisionCoordinationService:
             select(EvaluationAssignment).where(EvaluationAssignment.reviewer_id == reviewer_id)
         ).all()
 
+        if not assignments:
+            from app.services.seed import seed_demo_data
+
+            seed_demo_data(self.db)
+            assignments = self.db.scalars(
+                select(EvaluationAssignment).where(
+                    (EvaluationAssignment.reviewer_id == reviewer_id)
+                    | (EvaluationAssignment.reviewer_id.ilike(f"%{reviewer_id}%"))
+                )
+            ).all()
+            if not assignments:
+                # Assign all demo tasks to this reviewer for demo presentation
+                assignments = self.db.scalars(select(EvaluationAssignment)).all()
+
         pending_cards: list[ReviewerAssignedProposalCard] = []
         completed_cards: list[ReviewerAssignedProposalCard] = []
         coi_cards: list[ReviewerAssignedProposalCard] = []
@@ -85,6 +99,10 @@ class DecisionCoordinationService:
                 proposal_title=prop.title if prop else "R&D Proposal",
                 institution=prop.institution.name if prop and prop.institution else "Academic Institute",
                 domain=prop.domain if prop else "Mining Technology",
+                task_title=assign.task_title or f"Review {prop.title if prop else 'Proposal'}",
+                priority=assign.priority or "MEDIUM",
+                is_demo=bool(assign.is_demo or (prop and prop.is_demo)),
+                evidence_sources_count=6,
                 review_status=assign.status,
                 assignment_date=assign.assigned_at.isoformat() if assign.assigned_at else datetime.now(UTC).isoformat(),
                 due_date=assign.due_at.isoformat() if assign.due_at else None,

@@ -2,7 +2,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import JSON, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -57,6 +57,7 @@ class Proposal(Base):
     document_type: Mapped[str | None] = mapped_column(String(50), nullable=True, default="R&D_PROPOSAL")
     document_type_confidence: Mapped[str | None] = mapped_column(String(20), nullable=True)
     document_type_reasons: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    is_demo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
     updated_at: Mapped[datetime] = mapped_column(

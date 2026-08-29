@@ -7,6 +7,10 @@ export interface ReviewerAssignedProposalCard {
   proposalTitle: string;
   institution: string;
   domain: string;
+  taskTitle?: string;
+  priority?: string;
+  isDemo?: boolean;
+  evidenceSourcesCount?: number;
   reviewStatus: string;
   assignmentDate: string;
   dueDate: string | null;
@@ -16,6 +20,40 @@ export interface ReviewerAssignedProposalCard {
   evidenceGapsCount: number;
   consensusStatus: string;
   actionRequired: string;
+}
+
+export interface EvidenceReadinessComponentDetail {
+  name: string;
+  score: number;
+  maxScore: number;
+  status: string;
+  explanation: string;
+  contributingChecks: string[];
+}
+
+export interface EvidenceReadinessItem {
+  evidenceId: string;
+  title: string;
+  description: string;
+  sourceType: string;
+}
+
+export interface EvidenceReadinessResponse {
+  proposalId: string;
+  totalScore: number;
+  maxScore: number;
+  interpretationLabel: string;
+  isDemo: boolean;
+  disclaimer: string;
+  proposalCompletenessScore: number;
+  scientificEvidenceCoverageScore: number;
+  mocGuidelineCoverageScore: number;
+  financialVerificationScore: number;
+  historicalResearchSupportScore: number;
+  reviewerCompletionScore: number;
+  components: EvidenceReadinessComponentDetail[];
+  strengths: { evidenceId: string; title: string; description: string; sourceType: string }[];
+  attentionRequired: { evidenceId: string; title: string; description: string; sourceType: string }[];
 }
 
 export interface ReviewerWorkspaceQueue {
@@ -231,6 +269,45 @@ export const coordinationService = {
       generatedAt: data.generated_at,
     };
   },
+  async getEvidenceReadiness(proposalId: string): Promise<EvidenceReadinessResponse> {
+    const res = await fetch(`${appConfig.apiBaseUrl}/proposals/${proposalId}/evidence-readiness`, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch evidence readiness score");
+    const data = await res.json();
+    return {
+      proposalId: data.proposal_id,
+      totalScore: data.total_score,
+      maxScore: data.max_score || 100,
+      interpretationLabel: data.interpretation_label,
+      isDemo: Boolean(data.is_demo),
+      disclaimer: data.disclaimer,
+      proposalCompletenessScore: data.proposal_completeness_score,
+      scientificEvidenceCoverageScore: data.scientific_evidence_coverage_score,
+      mocGuidelineCoverageScore: data.moc_guideline_coverage_score,
+      financialVerificationScore: data.financial_verification_score,
+      historicalResearchSupportScore: data.historical_research_support_score,
+      reviewerCompletionScore: data.reviewer_completion_score,
+      components: (data.components || []).map((c: Record<string, unknown>) => ({
+        name: c.name as string,
+        score: c.score as number,
+        maxScore: c.max_score as number,
+        status: c.status as string,
+        explanation: c.explanation as string,
+        contributingChecks: (c.contributing_checks as string[]) || [],
+      })),
+      strengths: (data.strengths || []).map((s: Record<string, unknown>) => ({
+        evidenceId: s.evidence_id as string,
+        title: s.title as string,
+        description: s.description as string,
+        sourceType: s.source_type as string,
+      })),
+      attentionRequired: (data.attention_required || []).map((s: Record<string, unknown>) => ({
+        evidenceId: s.evidence_id as string,
+        title: s.title as string,
+        description: s.description as string,
+        sourceType: s.source_type as string,
+      })),
+    } as unknown as EvidenceReadinessResponse;
+  },
 };
 
 function mapCard(item: Record<string, unknown>): ReviewerAssignedProposalCard {
@@ -241,6 +318,10 @@ function mapCard(item: Record<string, unknown>): ReviewerAssignedProposalCard {
     proposalTitle: item.proposal_title as string,
     institution: item.institution as string,
     domain: item.domain as string,
+    taskTitle: (item.task_title as string) || `Review ${item.proposal_title}`,
+    priority: (item.priority as string) || "MEDIUM",
+    isDemo: Boolean(item.is_demo),
+    evidenceSourcesCount: (item.evidence_sources_count as number) || 6,
     reviewStatus: item.review_status as string,
     assignmentDate: item.assignment_date as string,
     dueDate: (item.due_date as string) || null,
