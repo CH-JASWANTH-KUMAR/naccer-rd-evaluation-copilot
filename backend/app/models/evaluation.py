@@ -2,7 +2,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, Float, ForeignKey, String, Text
+from sqlalchemy import JSON, DateTime, Float, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -92,6 +92,17 @@ class EvaluationCriterion(Base):
     weighted_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     comments: Mapped[str | None] = mapped_column(Text, nullable=True)
     justification_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Guideline-to-Evidence Matrix Fields (Step 7)
+    evidence_status: Mapped[str] = mapped_column(String(50), nullable=False, default="NOT_REPORTED")
+    proposal_evidence_ids: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    historical_evidence_ids: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    paper_evidence_ids: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    scrutiny_evidence_ids: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    financial_evidence_ids: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    evidence_gaps: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    reviewer_questions: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    evidence_coverage_score: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
     updated_at: Mapped[datetime] = mapped_column(

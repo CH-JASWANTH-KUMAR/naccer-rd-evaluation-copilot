@@ -1,5 +1,5 @@
 import hashlib
-import re
+import io
 from pathlib import Path
 
 import pypdf
@@ -66,12 +66,67 @@ class ProposalIngestionService:
                     )
                 )
 
-        # 2. Check for Duplicate Document Hash
+        # 2. Extract Pages via pypdf to re-verify section extraction
+        try:
+            reader = pypdf.PdfReader(io.BytesIO(content))
+            pages_text: list[tuple[int, str]] = []
+            for p_idx, page in enumerate(reader.pages, start=1):
+                txt = page.extract_text() or ""
+                pages_text.append((p_idx, txt))
+        except Exception:
+            pages_text = []
+
         existing_doc = self.db.query(Document).filter(Document.document_hash == file_hash).first()
         if existing_doc:
             existing_prop = self.prop_repo.get_by_id(existing_doc.proposal_id)
-            if existing_prop:
-                return ProposalRead.model_validate(existing_prop)
+            if existing_prop and pages_text:
+                # 1. Invalidate stale pages and sections in DB
+                self.db.query(DocumentPage).filter(DocumentPage.document_id == existing_doc.id).delete()
+                self.db.query(ProposalSection).filter(ProposalSection.document_id == existing_doc.id).delete()
+                self.db.commit()
+
+                # 2. Save fresh pages
+                for idx, txt in pages_text:
+                    self.db.add(DocumentPage(document_id=existing_doc.id, page_number=idx, text=txt))
+                self.db.commit()
+
+                from app.services.document_type_classifier import classify_document
+                doc_type_res = classify_document(pages_text)
+
+                existing_doc.document_type = doc_type_res.document_type
+                existing_doc.document_type_confidence = doc_type_res.document_type_confidence
+                existing_doc.document_type_reasons = doc_type_res.document_type_reasons
+
+                existing_prop.document_type = doc_type_res.document_type
+                existing_prop.document_type_confidence = doc_type_res.document_type_confidence
+                existing_prop.document_type_reasons = doc_type_res.document_type_reasons
+
+                if doc_type_res.document_type == "RESEARCH_PAPER":
+                    extracted_fields, sections = self._extract_paper_sections(pages_text, existing_doc.id, existing_prop.id)
+                else:
+                    extracted_fields, sections = self._extract_proposal_sections(pages_text, existing_doc.id, existing_prop.id)
+
+                for sec in sections:
+                    self.db.add(sec)
+
+                existing_prop.problem_statement = extracted_fields.get("problem_statement", "NOT_REPORTED")
+                existing_prop.objectives = extracted_fields.get("objectives", "NOT_REPORTED")
+                existing_prop.methodology = extracted_fields.get("methodology", "NOT_REPORTED")
+                existing_prop.technology = extracted_fields.get("technology", "NOT_REPORTED")
+                existing_prop.expected_outcomes = extracted_fields.get("expected_outcomes", "NOT_REPORTED")
+                existing_prop.literature_review = extracted_fields.get("literature_review", "NOT_REPORTED")
+                existing_prop.timeline = extracted_fields.get("timeline", "NOT_REPORTED")
+
+                self.db.commit()
+                self.db.refresh(existing_prop)
+
+                from app.services.proposal_section_parser import parse_proposal_sections
+                parsed = parse_proposal_sections(pages_text)
+                struct_secs = self._build_structured_sections(parsed["sections"], doc_type_res.document_type, pages_text, existing_prop.id)
+
+                res_read = ProposalRead.model_validate(existing_prop)
+                res_read.structured_sections = struct_secs
+                return res_read
 
         # 3. Create Initial Proposal Record
         initial_title = title.strip() if title and title.strip() else f"Uploaded Proposal: {filename}"
@@ -108,7 +163,7 @@ class ProposalIngestionService:
         self.db.refresh(doc)
 
         # 5. Extract Pages via pypdf
-        pages_text: list[tuple[int, str]] = []
+        pages_text = []
         try:
             reader = pypdf.PdfReader(storage_path)
             page_count = len(reader.pages)
@@ -129,8 +184,23 @@ class ProposalIngestionService:
             doc.processing_error = f"Unable to parse PDF document: {exc}"
             self.db.commit()
 
-        # 6. Section Parsing & Field Extraction
-        extracted_fields, sections = self._extract_proposal_sections(pages_text, doc.id, proposal.id)
+        # 6. Document Type Classification
+        from app.services.document_type_classifier import classify_document
+        doc_type_res = classify_document(pages_text)
+
+        doc.document_type = doc_type_res.document_type
+        doc.document_type_confidence = doc_type_res.document_type_confidence
+        doc.document_type_reasons = doc_type_res.document_type_reasons
+
+        proposal.document_type = doc_type_res.document_type
+        proposal.document_type_confidence = doc_type_res.document_type_confidence
+        proposal.document_type_reasons = doc_type_res.document_type_reasons
+
+        # 7. Section Parsing & Field Extraction according to Document Type
+        if doc_type_res.document_type == "RESEARCH_PAPER":
+            extracted_fields, sections = self._extract_paper_sections(pages_text, doc.id, proposal.id)
+        else:
+            extracted_fields, sections = self._extract_proposal_sections(pages_text, doc.id, proposal.id)
 
         # Populate Proposal Fields (prioritizing explicit user input if provided)
         if not title and extracted_fields.get("title"):
@@ -141,16 +211,15 @@ class ProposalIngestionService:
             proposal.raw_budget_text = extracted_fields["raw_budget_text"]
         if (proposal.budget_total is None or proposal.budget_total <= 0) and extracted_fields.get("budget_total"):
             proposal.budget_total = extracted_fields["budget_total"]
-        if extracted_fields.get("problem_statement"):
-            proposal.problem_statement = extracted_fields["problem_statement"]
-        if extracted_fields.get("objectives"):
-            proposal.objectives = extracted_fields["objectives"]
-        if extracted_fields.get("methodology"):
-            proposal.methodology = extracted_fields["methodology"]
-        if extracted_fields.get("technology"):
-            proposal.technology = extracted_fields["technology"]
-        if extracted_fields.get("expected_outcomes"):
-            proposal.expected_outcomes = extracted_fields["expected_outcomes"]
+
+        proposal.problem_statement = extracted_fields.get("problem_statement", "NOT_REPORTED")
+        proposal.objectives = extracted_fields.get("objectives", "NOT_REPORTED")
+        proposal.methodology = extracted_fields.get("methodology", "NOT_REPORTED")
+        proposal.technology = extracted_fields.get("technology", "NOT_REPORTED")
+        proposal.expected_outcomes = extracted_fields.get("expected_outcomes", "NOT_REPORTED")
+        proposal.literature_review = extracted_fields.get("literature_review", "NOT_REPORTED")
+        proposal.timeline = extracted_fields.get("timeline", "NOT_REPORTED")
+
         if extracted_fields.get("duration_months"):
             proposal.duration_months = extracted_fields["duration_months"]
 
@@ -161,7 +230,7 @@ class ProposalIngestionService:
         doc.processing_status = "PROCESSED"
         self.db.commit()
 
-        # 7. Run Completeness & Compliance Scrutiny Engines
+        # 8. Run Completeness & Compliance Scrutiny Engines
         comp_report = ProposalCompletenessService.evaluate_completeness(proposal)
         proposal.completeness_status = comp_report.status
 
@@ -172,7 +241,13 @@ class ProposalIngestionService:
         self.db.commit()
         self.db.refresh(proposal)
 
-        return ProposalRead.model_validate(proposal)
+        from app.services.proposal_section_parser import parse_proposal_sections
+        parsed_data = parse_proposal_sections(pages_text)
+        struct_secs = self._build_structured_sections(parsed_data["sections"], doc_type_res.document_type, pages_text, proposal.id)
+
+        res_read = ProposalRead.model_validate(proposal)
+        res_read.structured_sections = struct_secs
+        return res_read
 
     def reprocess_proposal(self, proposal_id: str) -> ProposalRead:
         proposal = self.prop_repo.get_by_id(proposal_id)
@@ -197,105 +272,242 @@ class ProposalIngestionService:
     def _extract_proposal_sections(
         self, pages_text: list[tuple[int, str]], document_id: str, proposal_id: str
     ) -> tuple[dict, list[ProposalSection]]:
-        full_text = "\n".join([f"--- PAGE {p_num} ---\n{text}" for p_num, text in pages_text])
-        extracted: dict = {}
+        from app.services.proposal_section_parser import parse_proposal_sections
+
+        parsed_data = parse_proposal_sections(pages_text)
+        extracted: dict = parsed_data["metadata"]
+        sec_dict = parsed_data["sections"]
         sections: list[ProposalSection] = []
 
-        # 1. Extract Title
-        title_match = re.search(
-            r"(?:Title|Project Title|Name of Project)\s*:?\s*([^\n]+)", full_text, re.IGNORECASE
-        )
-        if title_match:
-            clean_title = title_match.group(1).replace("\n", " ").strip()
-            # Strip trailing filename patterns or extensions if appended
-            clean_title = re.sub(r"synthetic_rd_proposal_[a-z0-9_]+(?:\.pdf)?", "", clean_title, flags=re.IGNORECASE).strip()
-            extracted["title"] = clean_title
+        for key, s_res in sec_dict.items():
+            content_val = s_res.content if s_res.status in ["REPORTED", "EMPTY"] else "NOT_REPORTED"
+            extracted[key] = content_val
 
-        # Extract Principal Investigator
-        pi_match = re.search(
-            r"(?:Principal Investigator|\bPI\b)\s*:?\s*([^\n]+)", full_text, re.IGNORECASE
-        )
-        if pi_match:
-            clean_pi = pi_match.group(1).replace("\n", " ").strip()
-            clean_pi = re.sub(r",\s*Senior Principal Scientist.*$", "", clean_pi, flags=re.IGNORECASE).strip()
-            extracted["principal_investigator"] = clean_pi
-
-        # 2. Extract Objectives
-        obj_match = re.search(
-            r"(?:Objectives|Project Objectives|Technical Objectives)\s*:?\s*([^\n]+(?:\n[^\n]+){1,10})",
-            full_text,
-            re.IGNORECASE,
-        )
-        if obj_match:
-            extracted["objectives"] = obj_match.group(1).strip()
-            sections.append(
-                ProposalSection(
-                    proposal_id=proposal_id,
-                    document_id=document_id,
-                    section_type="Objectives",
-                    section_title="Objectives",
-                    start_page=1,
-                    end_page=1,
-                    content=extracted["objectives"],
+            if s_res.status == "REPORTED":
+                sections.append(
+                    ProposalSection(
+                        proposal_id=proposal_id,
+                        document_id=document_id,
+                        section_type=s_res.section_type,
+                        section_title=s_res.section_title,
+                        start_page=s_res.source_page_start,
+                        end_page=s_res.source_page_end,
+                        content=s_res.content,
+                        confidence=1.0 if s_res.extraction_confidence == "HIGH" else 0.5,
+                    )
                 )
-            )
 
-        # 3. Extract Methodology
-        meth_match = re.search(
-            r"(?:Methodology|Proposed Methodology|Technical Approach|Method)\s*:?\s*([^\n]+(?:\n[^\n]+){1,10})",
-            full_text,
-            re.IGNORECASE,
-        )
-        if meth_match:
-            extracted["methodology"] = meth_match.group(1).strip()
-            sections.append(
-                ProposalSection(
-                    proposal_id=proposal_id,
-                    document_id=document_id,
-                    section_type="Methodology",
-                    section_title="Methodology",
-                    start_page=1,
-                    end_page=2,
-                    content=extracted["methodology"],
-                )
-            )
-
-        # 4. Extract Technology
-        tech_match = re.search(
-            r"(?:Technology|Technologies|Tools & Equipment|Hardware & Software)\s*:?\s*([^\n]+)",
-            full_text,
-            re.IGNORECASE,
-        )
-        if tech_match:
-            extracted["technology"] = tech_match.group(1).strip()
-
-        # 5. Extract Problem Statement
-        prob_match = re.search(
-            r"(?:Problem Statement|Background|Introduction|Research Gap)\s*:?\s*([^\n]+(?:\n[^\n]+){1,6})",
-            full_text,
-            re.IGNORECASE,
-        )
-        if prob_match:
-            extracted["problem_statement"] = prob_match.group(1).strip()
-
-        # 6. Extract Expected Outcomes
-        out_match = re.search(
-            r"(?:Expected Outcomes|Deliverables|Expected Deliverables|Results)\s*:?\s*([^\n]+(?:\n[^\n]+){1,6})",
-            full_text,
-            re.IGNORECASE,
-        )
-        if out_match:
-            extracted["expected_outcomes"] = out_match.group(1).strip()
-
-        # 7. Extract Budget
-        budget_match = re.search(
-            r"(?:Total Requested Budget|Total Budget|Estimated Cost|Project Cost|Total Outlay|Proposed Budget)\s*:?\s*(Rs\.?\s*[\d\.\,]+\s*(?:Lakhs?|Crores?|INR)?)",
-            full_text,
-            re.IGNORECASE,
-        )
-        if budget_match:
-            raw_b = budget_match.group(1).strip()
-            extracted["raw_budget_text"] = raw_b
-            extracted["budget_total"] = FinancialComplianceService._parse_currency(raw_b)
+        if extracted.get("raw_budget_text") and not extracted.get("budget_total"):
+            extracted["budget_total"] = FinancialComplianceService._parse_currency(extracted["raw_budget_text"])
 
         return extracted, sections
+
+    def _extract_paper_sections(
+        self, pages_text: list[tuple[int, str]], document_id: str, proposal_id: str
+    ) -> tuple[dict, list[ProposalSection]]:
+        """Extract paper-native sections for RESEARCH_PAPER documents without forcing proposal-specific fields."""
+        from app.services.proposal_section_parser import parse_proposal_sections
+
+        parsed_data = parse_proposal_sections(pages_text)
+        sec_dict = parsed_data["sections"]
+        sections: list[ProposalSection] = []
+
+        extracted: dict = {
+            "title": parsed_data["metadata"].get("title", ""),
+            "principal_investigator": parsed_data["metadata"].get("principal_investigator", ""),
+            "problem_statement": sec_dict["problem_statement"].content if sec_dict["problem_statement"].status == "REPORTED" else "NOT_APPLICABLE",
+            "objectives": "NOT_APPLICABLE",
+            "technology": "NOT_APPLICABLE",
+            "methodology": sec_dict["methodology"].content if sec_dict["methodology"].status == "REPORTED" else "NOT_APPLICABLE",
+            "expected_outcomes": "NOT_APPLICABLE",
+            "literature_review": sec_dict["literature_review"].content if sec_dict["literature_review"].status == "REPORTED" else "NOT_APPLICABLE",
+            "timeline": "NOT_APPLICABLE",
+            "raw_budget_text": "NOT_APPLICABLE",
+            "budget_total": 0.0,
+        }
+
+        # Store native paper sections for auditability
+        for key in ["problem_statement", "literature_review", "methodology", "references"]:
+            s_res = sec_dict.get(key)
+            if s_res and s_res.status == "REPORTED":
+                sections.append(
+                    ProposalSection(
+                        proposal_id=proposal_id,
+                        document_id=document_id,
+                        section_type=s_res.section_type,
+                        section_title=s_res.section_title,
+                        start_page=s_res.source_page_start,
+                        end_page=s_res.source_page_end,
+                        content=s_res.content,
+                        confidence=1.0,
+                    )
+                )
+
+        return extracted, sections
+
+    def _build_structured_sections(
+        self, sec_dict: dict, document_type: str, pages_text: list[tuple[int, str]] | None = None, proposal_id: str = ""
+    ) -> list:
+        from app.schemas.document import StructuredSectionRead
+        from app.services.section_summarizer import generate_section_summary
+
+        res: list[StructuredSectionRead] = []
+        prop_prefix = proposal_id[:6] if proposal_id else "000"
+
+        all_text = " ".join([getattr(s, "content", "") for s in sec_dict.values() if hasattr(s, "content")]).lower()
+        is_review_paper = any(
+            term in all_text for term in ["systematic review", "scoping review", "literature review", "review article", "synthesizes peer-reviewed", "review paper"]
+        ) or any(k in sec_dict for k in ["review_purpose", "review_methodology", "evidence_base", "future_directions"])
+
+        if document_type == "RESEARCH_PAPER":
+            if is_review_paper:
+                paper_order = [
+                    ("abstract", "Abstract"),
+                    ("problem_statement", "Research Problem / Motivation"),
+                    ("research_gap", "Research Gap"),
+                    ("review_purpose", "Review Purpose / Scope"),
+                    ("literature_review", "Literature / Background"),
+                    ("review_methodology", "Review Methodology / Search Strategy"),
+                    ("evidence_base", "Evidence Base / Techniques"),
+                    ("key_findings", "Key Findings / Synthesis"),
+                    ("limitations", "Study Limitations"),
+                    ("future_directions", "Future Directions & Recommendations"),
+                    ("references", "References & Citations"),
+                ]
+            else:
+                paper_order = [
+                    ("abstract", "Abstract"),
+                    ("problem_statement", "Research Problem / Motivation"),
+                    ("research_gap", "Research Gap / Need"),
+                    ("objectives", "Study Purpose / Research Questions"),
+                    ("literature_review", "Literature Review / Background"),
+                    ("methodology", "Methodology / Study Design"),
+                    ("tools_techniques", "Tools / Techniques / Approaches"),
+                    ("results", "Results / Key Findings"),
+                    ("discussion", "Discussion & Implications"),
+                    ("limitations", "Study Limitations"),
+                    ("future_work", "Future Work & Recommendations"),
+                    ("references", "References & Citations"),
+                ]
+
+            ev_counter = 1
+            for tuple_item in paper_order:
+                key = tuple_item[0]
+                display_title = tuple_item[1]
+
+                s_res = sec_dict.get(key)
+                if not s_res or s_res.status != "REPORTED":
+                    fallback_key = None
+                    if key == "review_purpose":
+                        fallback_key = "objectives"
+                    elif key == "review_methodology":
+                        fallback_key = "methodology"
+                    elif key == "evidence_base":
+                        fallback_key = "tools_techniques"
+                    elif key == "key_findings":
+                        fallback_key = "results"
+                    elif key == "future_directions":
+                        fallback_key = "future_work"
+
+                    if fallback_key and fallback_key in sec_dict:
+                        f_res = sec_dict[fallback_key]
+                        if f_res.status == "REPORTED":
+                            s_res = f_res
+
+                if s_res and s_res.status == "REPORTED" and s_res.content not in ["NOT_REPORTED", "NOT_APPLICABLE", "EMPTY"]:
+                    start_p = s_res.source_page_start
+                    end_p = s_res.source_page_end
+                    if pages_text:
+                        range_text = " ".join([txt for idx, txt in pages_text if start_p <= idx <= end_p])
+                        if not range_text:
+                            start_p, end_p = 1, len(pages_text)
+
+                    summ = generate_section_summary(key, s_res.content)
+                    res.append(
+                        StructuredSectionRead(
+                            key=key,
+                            display_title=display_title,
+                            content=s_res.content,
+                            summary=summ,
+                            status="REPORTED",
+                            source_page_start=start_p,
+                            source_page_end=end_p,
+                            extraction_confidence=s_res.extraction_confidence,
+                            evidence_id=f"PAPER-{prop_prefix}-EVID-{ev_counter:03d}",
+                        )
+                    )
+                    ev_counter += 1
+                else:
+                    res.append(
+                        StructuredSectionRead(
+                            key=key,
+                            display_title=display_title,
+                            content="NOT_REPORTED",
+                            summary="NOT_REPORTED",
+                            status="NOT_REPORTED",
+                            source_page_start=1,
+                            source_page_end=1,
+                            extraction_confidence="HIGH",
+                            evidence_id=f"PAPER-{prop_prefix}-EVID-{ev_counter:03d}",
+                        )
+                    )
+                    ev_counter += 1
+        else:
+            proposal_order = [
+                ("problem_statement", "Problem Statement & Context"),
+                ("research_gap", "Research Gap"),
+                ("objectives", "Project Objectives"),
+                ("technology", "Technology & Infrastructure"),
+                ("methodology", "Proposed Methodology"),
+                ("validation_plan", "Experimental Validation Plan"),
+                ("expected_outcomes", "Expected Outcomes & Deliverables"),
+                ("budget", "Project Budget & Financial Breakdown"),
+                ("timeline", "Project Timeline & Milestones"),
+                ("literature_review", "Literature Review"),
+                ("team", "Team & Institutional Capability"),
+                ("references", "References"),
+            ]
+
+            ev_counter = 1
+            for key, display_title in proposal_order:
+                s_res = sec_dict.get(key)
+                if s_res and s_res.status == "REPORTED" and s_res.content not in ["NOT_REPORTED", "NOT_APPLICABLE", "EMPTY"]:
+                    start_p = s_res.source_page_start
+                    end_p = s_res.source_page_end
+                    if pages_text:
+                        range_text = " ".join([txt for idx, txt in pages_text if start_p <= idx <= end_p])
+                        if not range_text:
+                            start_p, end_p = 1, len(pages_text)
+
+                    summ = generate_section_summary(key, s_res.content)
+                    res.append(
+                        StructuredSectionRead(
+                            key=key,
+                            display_title=display_title,
+                            content=s_res.content,
+                            summary=summ,
+                            status="REPORTED",
+                            source_page_start=start_p,
+                            source_page_end=end_p,
+                            extraction_confidence=s_res.extraction_confidence,
+                            evidence_id=f"PROP-{prop_prefix}-EVID-{ev_counter:03d}",
+                        )
+                    )
+                    ev_counter += 1
+                else:
+                    res.append(
+                        StructuredSectionRead(
+                            key=key,
+                            display_title=display_title,
+                            content="NOT_REPORTED",
+                            summary="NOT_REPORTED",
+                            status="NOT_REPORTED",
+                            source_page_start=1,
+                            source_page_end=1,
+                            extraction_confidence="HIGH",
+                            evidence_id=f"PROP-{prop_prefix}-EVID-{ev_counter:03d}",
+                        )
+                    )
+                    ev_counter += 1
+
+        return res

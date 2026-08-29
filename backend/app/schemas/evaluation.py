@@ -17,6 +17,15 @@ class EvaluationCriterionRead(ORMBase):
     weighted_score: float | None = None
     comments: str | None = None
     justification_notes: str | None = None
+    evidence_status: str = "NOT_REPORTED"
+    proposal_evidence_ids: list | dict | None = None
+    historical_evidence_ids: list | dict | None = None
+    paper_evidence_ids: list | dict | None = None
+    scrutiny_evidence_ids: list | dict | None = None
+    financial_evidence_ids: list | dict | None = None
+    evidence_gaps: list | dict | None = None
+    reviewer_questions: list | dict | None = None
+    evidence_coverage_score: float | None = None
 
 
 class EvaluationCriterionUpdate(ORMBase):

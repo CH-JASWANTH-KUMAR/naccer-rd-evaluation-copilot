@@ -2,7 +2,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String
+from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -26,6 +26,10 @@ class Document(Base):
     storage_path: Mapped[str] = mapped_column(String(500), nullable=False)
     processing_status: Mapped[str] = mapped_column(String(50), nullable=False, default="UPLOADED")
     processing_error: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+
+    document_type: Mapped[str] = mapped_column(String(50), nullable=False, default="R&D_PROPOSAL")
+    document_type_confidence: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    document_type_reasons: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
     updated_at: Mapped[datetime] = mapped_column(

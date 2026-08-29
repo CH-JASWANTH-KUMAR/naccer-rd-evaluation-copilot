@@ -27,6 +27,18 @@ class ProposalSectionRead(ORMBase):
     updated_at: datetime
 
 
+class StructuredSectionRead(ORMBase):
+    key: str
+    display_title: str
+    content: str
+    summary: str
+    status: str = "REPORTED"
+    source_page_start: int = 1
+    source_page_end: int = 1
+    extraction_confidence: str = "HIGH"
+    evidence_id: str = "EVID-000"
+
+
 class DocumentRead(ORMBase):
     id: str
     proposal_id: str
@@ -36,6 +48,10 @@ class DocumentRead(ORMBase):
     storage_path: str
     processing_status: str
     processing_error: str | None = None
+    document_type: str = "R&D_PROPOSAL"
+    document_type_confidence: str | None = None
+    document_type_reasons: list[str] | None = None
+    structured_sections: list[StructuredSectionRead] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
 

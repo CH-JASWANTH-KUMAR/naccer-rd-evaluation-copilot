@@ -11,8 +11,8 @@ def test_active_rubric_seeding(client: TestClient):
     assert res.status_code == 200
     data = res.json()
     assert data["version"] == "v1.0"
-    assert len(data["criteria"]) == 6
-    assert any(c["key"] == "NOVELTY" for c in data["criteria"])
+    assert len(data["criteria"]) == 8
+    assert any(c["key"] == "THRUST_AREA_ALIGNMENT" for c in data["criteria"])
 
 
 def test_evaluation_workflow_end_to_end(client: TestClient):
@@ -31,7 +31,7 @@ def test_evaluation_workflow_end_to_end(client: TestClient):
     eval_data = eval_res.json()
     eval_id = eval_data["id"]
     assert eval_data["status"] == "DRAFT"
-    assert len(eval_data["criteria"]) == 6
+    assert len(eval_data["criteria"]) == 8
     assert len(eval_data["evidences"]) >= 2
 
     # 3. Update Evaluation Draft Scores & Comments

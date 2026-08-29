@@ -16,17 +16,23 @@ export interface ProposalCompletenessReport {
 
 export interface FinancialComplianceReport {
   proposalId: string;
-  status: "COMPLIANT" | "FLAGGED" | "NEEDS_JUSTIFICATION";
+  status: "COMPLIANT" | "FLAGGED" | "NEEDS_JUSTIFICATION" | string;
   declaredTotal: number;
-  calculatedTotal: number;
+  calculatedTotal: number | null;
+  arithmeticStatus: "MATCH" | "MISMATCH" | "NOT_VERIFIABLE" | string;
+  varianceAmount: number | null;
+  extractionSummaryStatus: "FULL_BREAKDOWN" | "PARTIAL_BREAKDOWN" | "MISSING_BREAKDOWN" | string;
+  explanation: string;
   arithmeticMismatch: boolean;
   differenceAmount: number;
   findings: Array<{
     costHead: string;
     proposedAmount: number;
+    normalizedAmount?: number | null;
     rawAmountString?: string | null;
     complianceStatus: string;
     sourcePage?: number | null;
+    extractionStatus?: string | null;
     notes?: string | null;
   }>;
 }
@@ -48,6 +54,54 @@ export interface ProposalSourceProvenance {
       extractedText: string;
     }>;
   }>;
+}
+
+export interface ScientificComparisonRecord {
+  comparisonId: string;
+  dimension: string;
+  proposalField: string;
+  proposalValue: string;
+  evidenceSourceType: string;
+  evidenceSourceId: string;
+  evidenceValue: string;
+  comparisonStatus: "MATCHING" | "PARTIALLY_MATCHING" | "DIFFERENT" | "NOT_REPORTED" | "NOT_COMPARABLE" | "UNRESOLVED" | "CONFLICTING_EVIDENCE";
+  explanation: string;
+  sourcePageStart?: number | null;
+  sourcePageEnd?: number | null;
+  evidenceId: string;
+  confidence: string;
+}
+
+export interface EvidenceGapRecord {
+  dimension: string;
+  gap: string;
+  reviewerAction: string;
+  evidenceSupportingGap: string;
+}
+
+export interface ReviewerQuestionRecord {
+  questionId: string;
+  dimension: string;
+  question: string;
+  evidenceId: string;
+  rationale: string;
+}
+
+export interface EvidenceSourceSummary {
+  sourceType: string;
+  evidenceId: string;
+  title: string;
+  relevanceScore: number;
+  matchedDimensions: string[];
+}
+
+export interface ProposalScientificComparisonResponse {
+  proposalId: string;
+  comparisonSummary: Record<string, number>;
+  comparisons: ScientificComparisonRecord[];
+  evidenceGaps: EvidenceGapRecord[];
+  reviewerQuestions: ReviewerQuestionRecord[];
+  evidenceSources: EvidenceSourceSummary[];
 }
 
 interface ApiProposal {
@@ -73,6 +127,10 @@ interface ApiProposal {
   compliance_status: "COMPLIANT" | "FLAGGED" | "NEEDS_JUSTIFICATION";
   processing_status: string;
   processing_error?: string | null;
+  document_type?: string | null;
+  document_type_confidence?: string | null;
+  document_type_reasons?: string[] | null;
+  structured_sections?: Record<string, unknown>[] | null;
   submission_date: string;
   created_at: string;
 }
@@ -148,14 +206,12 @@ export const proposalService = {
   async getProposalById(id: string): Promise<Proposal | null> {
     try {
       const res = await fetch(`${appConfig.apiBaseUrl}/proposals/${id}`, { cache: "no-store" });
-      if (res.ok) {
-        const item: ApiProposal = await res.json();
-        return proposalService._mapProposal(item);
-      }
+      if (!res.ok) return null;
+      const item: ApiProposal = await res.json();
+      return proposalService._mapProposal(item);
     } catch {
-      // Fallback
+      return null;
     }
-    return null;
   },
 
   async uploadProposalPdf(formData: FormData): Promise<Proposal> {
@@ -164,91 +220,92 @@ export const proposalService = {
       body: formData,
     });
     if (!res.ok) {
-      throw new Error(`Failed to upload proposal: ${res.statusText}`);
+      const err = await res.json().catch(() => null);
+      throw new Error(err?.detail || `Upload failed with status ${res.status}`);
     }
     const item: ApiProposal = await res.json();
     return proposalService._mapProposal(item);
   },
 
-  async getProposalSource(id: string): Promise<ProposalSourceProvenance | null> {
-    try {
-      const res = await fetch(`${appConfig.apiBaseUrl}/proposals/${id}/source`, { cache: "no-store" });
-      if (res.ok) {
-        const raw = await res.json();
-        return {
-          proposalId: raw.proposal_id || raw.proposalId,
-          proposalReference: raw.proposal_reference || raw.proposalReference,
-          title: raw.title,
-          documents: ((raw.documents as Record<string, unknown>[]) || []).map((doc) => ({
-            documentId: (doc.document_id as string) || (doc.documentId as string) || "",
-            filename: (doc.filename as string) || "",
-            fileSize: (doc.file_size as number) ?? (doc.fileSize as number) ?? 0,
-            documentHash: (doc.document_hash as string) || (doc.documentHash as string) || null,
-            pageCount: (doc.page_count as number) ?? (doc.pageCount as number) ?? 0,
-            storagePath: (doc.storage_path as string) || (doc.storagePath as string) || "",
-            pages: (((doc.pages as Record<string, unknown>[]) || []).map((p) => ({
-              pageNumber: (p.page_number as number) ?? (p.pageNumber as number) ?? 1,
-              characterCount: (p.character_count as number) ?? (p.characterCount as number) ?? 0,
-              extractedText: (p.extracted_text as string) || (p.extractedText as string) || "",
-            }))),
-          })),
-        };
-      }
-    } catch {
-      // Fallback
-    }
-    return null;
-  },
-
   async getProposalCompleteness(id: string): Promise<ProposalCompletenessReport | null> {
     try {
       const res = await fetch(`${appConfig.apiBaseUrl}/proposals/${id}/completeness`, { cache: "no-store" });
-      if (res.ok) {
-        const raw = await res.json();
-        return {
-          proposalId: raw.proposal_id || raw.proposalId,
-          status: raw.status,
-          missingFields: raw.missing_fields || raw.missingFields || [],
-          warnings: raw.warnings || [],
-          findings: ((raw.findings as Record<string, unknown>[]) || []).map((f) => ({
-            field: (f.field as string) || "",
-            severity: (f.severity as "ERROR" | "WARNING" | "INFO") || "INFO",
-            message: (f.message as string) || "",
-          })),
-        };
-      }
+      if (!res.ok) return null;
+      const data = await res.json();
+      return {
+        proposalId: data.proposal_id || id,
+        status: data.status,
+        missingFields: data.missing_fields || [],
+        warnings: data.warnings || [],
+        findings: (data.findings || []).map((f: Record<string, unknown>) => ({
+          field: f.field as string,
+          severity: f.severity as "ERROR" | "WARNING" | "INFO",
+          message: f.message as string,
+        })),
+      };
     } catch {
-      // Fallback
+      return null;
     }
-    return null;
   },
 
   async getProposalCompliance(id: string): Promise<FinancialComplianceReport | null> {
     try {
       const res = await fetch(`${appConfig.apiBaseUrl}/proposals/${id}/compliance`, { cache: "no-store" });
-      if (res.ok) {
-        const raw = await res.json();
-        return {
-          proposalId: raw.proposal_id,
-          status: raw.status,
-          declaredTotal: raw.declared_total,
-          calculatedTotal: raw.calculated_total,
-          arithmeticMismatch: raw.arithmetic_mismatch,
-          differenceAmount: raw.difference_amount,
-          findings: ((raw.findings as Record<string, unknown>[]) || []).map((f) => ({
-            costHead: (f.cost_head as string) || (f.costHead as string) || "Cost Head Breakdown",
-            proposedAmount: (f.proposed_amount as number) ?? (f.proposedAmount as number) ?? 0,
-            rawAmountString: (f.raw_amount_string as string) || (f.rawAmountString as string) || null,
-            complianceStatus: (f.compliance_status as string) || (f.complianceStatus as string) || "COMPLIANT",
-            sourcePage: (f.source_page as number) || (f.sourcePage as number) || null,
-            notes: (f.notes as string) || null,
-          })),
-        };
-      }
+      if (!res.ok) return null;
+      const data = await res.json();
+      return {
+        proposalId: data.proposal_id || id,
+        status: data.status,
+        declaredTotal: data.declared_total ?? 0,
+        calculatedTotal: data.calculated_total !== undefined && data.calculated_total !== null ? data.calculated_total : null,
+        arithmeticStatus: data.arithmetic_status || (data.arithmetic_mismatch ? "MISMATCH" : "MATCH"),
+        varianceAmount: data.variance_amount !== undefined && data.variance_amount !== null ? data.variance_amount : null,
+        extractionSummaryStatus: data.extraction_summary_status || "FULL_BREAKDOWN",
+        explanation: data.explanation || "",
+        arithmeticMismatch: data.arithmetic_mismatch || false,
+        differenceAmount: data.difference_amount || 0,
+        findings: (data.findings || []).map((f: Record<string, unknown>) => ({
+          costHead: f.cost_head as string,
+          proposedAmount: f.proposed_amount as number,
+          normalizedAmount: f.normalized_amount as number | undefined,
+          rawAmountString: (f.raw_amount_string as string) || undefined,
+          complianceStatus: (f.compliance_status as string) || "COMPLIANT",
+          sourcePage: (f.source_page as number) || undefined,
+          extractionStatus: (f.extraction_status as string) || "EXTRACTED",
+          notes: (f.notes as string) || undefined,
+        })),
+      };
     } catch {
-      // Fallback
+      return null;
     }
-    return null;
+  },
+
+  async getProposalSource(id: string): Promise<ProposalSourceProvenance | null> {
+    try {
+      const res = await fetch(`${appConfig.apiBaseUrl}/proposals/${id}/source`, { cache: "no-store" });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return {
+        proposalId: data.proposal_id || id,
+        proposalReference: data.proposal_reference || "",
+        title: data.title || "",
+        documents: (data.documents || []).map((d: Record<string, unknown>) => ({
+          documentId: d.document_id as string,
+          filename: d.filename as string,
+          fileSize: d.file_size as number,
+          documentHash: (d.document_hash as string) || null,
+          pageCount: d.page_count as number,
+          storagePath: d.storage_path as string,
+          pages: ((d.pages as Record<string, unknown>[]) || []).map((p) => ({
+            pageNumber: p.page_number as number,
+            characterCount: p.character_count as number,
+            extractedText: (p.extracted_text as string) || "",
+          })),
+        })),
+      };
+    } catch {
+      return null;
+    }
   },
 
   async reprocessProposal(id: string): Promise<Proposal> {
@@ -310,6 +367,53 @@ export const proposalService = {
     };
   },
 
+  async getScientificComparison(proposalId: string): Promise<ProposalScientificComparisonResponse> {
+    const res = await fetch(`${appConfig.apiBaseUrl}/proposals/${proposalId}/scientific-comparison`, {
+      cache: "no-store",
+    });
+    if (!res.ok) throw new Error("Failed to load scientific comparison");
+    const data = await res.json();
+    return {
+      proposalId: data.proposal_id,
+      comparisonSummary: data.comparison_summary || {},
+      comparisons: (data.comparisons || []).map((c: Record<string, unknown>) => ({
+        comparisonId: c.comparison_id as string,
+        dimension: c.dimension as string,
+        proposalField: c.proposal_field as string,
+        proposalValue: c.proposal_value as string,
+        evidenceSourceType: c.evidence_source_type as string,
+        evidenceSourceId: c.evidence_source_id as string,
+        evidenceValue: c.evidence_value as string,
+        comparisonStatus: c.comparison_status as ScientificComparisonRecord["comparisonStatus"],
+        explanation: c.explanation as string,
+        sourcePageStart: (c.source_page_start as number) || null,
+        sourcePageEnd: (c.source_page_end as number) || null,
+        evidenceId: c.evidence_id as string,
+        confidence: (c.confidence as string) || "HIGH",
+      })),
+      evidenceGaps: (data.evidence_gaps || []).map((g: Record<string, unknown>) => ({
+        dimension: g.dimension as string,
+        gap: g.gap as string,
+        reviewerAction: g.reviewer_action as string,
+        evidenceSupportingGap: g.evidence_supporting_gap as string,
+      })),
+      reviewerQuestions: (data.reviewer_questions || []).map((q: Record<string, unknown>) => ({
+        questionId: q.question_id as string,
+        dimension: q.dimension as string,
+        question: q.question as string,
+        evidenceId: q.evidence_id as string,
+        rationale: q.rationale as string,
+      })),
+      evidenceSources: (data.evidence_sources || []).map((s: Record<string, unknown>) => ({
+        sourceType: s.source_type as string,
+        evidenceId: s.evidence_id as string,
+        title: s.title as string,
+        relevanceScore: s.relevance_score as number,
+        matchedDimensions: (s.matched_dimensions as string[]) || [],
+      })),
+    };
+  },
+
   _mapProposal(item: ApiProposal): Proposal {
     return {
       id: item.id,
@@ -343,6 +447,20 @@ export const proposalService = {
       complianceStatus: item.compliance_status || "COMPLIANT",
       processingStatus: item.processing_status || "UPLOADED",
       processingError: item.processing_error || undefined,
+      documentType: item.document_type || "R&D_PROPOSAL",
+      documentTypeConfidence: item.document_type_confidence || "HIGH",
+      documentTypeReasons: item.document_type_reasons || [],
+      structuredSections: (item.structured_sections || []).map((s: Record<string, unknown>) => ({
+        key: s.key as string,
+        displayTitle: s.display_title as string,
+        content: s.content as string,
+        summary: s.summary as string,
+        status: s.status as string,
+        sourcePageStart: s.source_page_start as number,
+        sourcePageEnd: s.source_page_end as number,
+        extractionConfidence: s.extraction_confidence as string,
+        evidenceId: s.evidence_id as string,
+      })),
       keywords: [item.domain],
     };
   },

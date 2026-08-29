@@ -2,7 +2,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -45,6 +45,15 @@ class RubricCriterion(Base):
     display_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     required: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     evidence_required: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+    # Official Guideline Provenance (Phase P0.6 / Step 7)
+    source_document: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    source_page: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    source_section: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    original_criterion_wording: Mapped[str | None] = mapped_column(Text, nullable=True)
+    scoring_instructions: Mapped[str | None] = mapped_column(String(255), nullable=True, default="NOT_SPECIFIED")
+    scoring_scale: Mapped[str | None] = mapped_column(String(100), nullable=True, default="NOT_SPECIFIED")
+    evidence_requirements: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
 

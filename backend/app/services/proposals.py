@@ -33,7 +33,22 @@ class ProposalService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Proposal with ID '{proposal_id}' not found.",
             )
-        return ProposalRead.model_validate(proposal)
+        prop_read = ProposalRead.model_validate(proposal)
+
+        if proposal.documents:
+            doc = proposal.documents[0]
+            if doc.pages:
+                pages_text = [(p.page_number, p.text) for p in doc.pages]
+                from app.services.proposal_ingestion import ProposalIngestionService
+                from app.services.proposal_section_parser import parse_proposal_sections
+
+                parsed_data = parse_proposal_sections(pages_text)
+                svc = ProposalIngestionService(self.repo.db)
+                prop_read.structured_sections = svc._build_structured_sections(
+                    parsed_data["sections"], proposal.document_type or "R&D_PROPOSAL"
+                )
+
+        return prop_read
 
     def create_proposal(self, data: ProposalCreate) -> ProposalRead:
         proposal = self.repo.create(data)

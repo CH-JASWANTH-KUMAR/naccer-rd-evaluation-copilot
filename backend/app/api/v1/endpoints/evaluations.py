@@ -161,3 +161,34 @@ def export_decision_pack_pdf(evaluation_id: str, db: Session = Depends(get_db)):
         content=html_content,
         headers={"Content-Disposition": f"inline; filename=decision_pack_{evaluation_id[:8]}.html"},
     )
+
+
+# Step 7 Endpoints — Human Rubric Scoring & Criterion Patch
+
+@router.post("/{evaluation_id}/rubric-scores", summary="Submit human reviewer rubric scores and justifications")
+def submit_human_rubric_scores(
+    evaluation_id: str,
+    scores_data: list[dict],
+    db: Session = Depends(get_db),
+):
+    """Save human reviewer scores, comments, and justification notes for rubric criteria."""
+    service = EvaluationService(db)
+    return service.update_human_rubric_scores(evaluation_id, scores_data)
+
+
+@router.patch("/{evaluation_id}/rubric-criteria/{criterion_id}", summary="Update single criterion score and justification")
+def update_single_rubric_criterion(
+    evaluation_id: str,
+    criterion_id: str,
+    payload: dict,
+    db: Session = Depends(get_db),
+):
+    """Update human reviewer score, comments, or justification notes for a single criterion."""
+    service = EvaluationService(db)
+    return service.update_single_criterion_score(
+        evaluation_id=evaluation_id,
+        criterion_id=criterion_id,
+        score=payload.get("score"),
+        comments=payload.get("comments"),
+        justification_notes=payload.get("justification_notes"),
+    )

@@ -20,23 +20,27 @@ class ProposalCompletenessService:
                 )
             )
 
-        if not proposal.objectives or len(proposal.objectives.strip()) < 15:
+        obj_val = (proposal.objectives or "").strip()
+        if not obj_val or obj_val == "NOT_REPORTED" or len(obj_val) < 15:
             missing_fields.append("objectives")
+            msg = "Technical objectives section is unreadable (EXTRACTION_FAILED)." if obj_val == "EXTRACTION_FAILED" else "Technical objectives section is missing (NOT_REPORTED)."
             findings.append(
                 CompletenessFindingRead(
                     field="objectives",
                     severity="ERROR",
-                    message="Technical objectives section is missing or incomplete.",
+                    message=msg,
                 )
             )
 
-        if not proposal.methodology or len(proposal.methodology.strip()) < 15:
+        meth_val = (proposal.methodology or "").strip()
+        if not meth_val or meth_val == "NOT_REPORTED" or len(meth_val) < 15:
             missing_fields.append("methodology")
+            msg = "Research methodology section is unreadable (EXTRACTION_FAILED)." if meth_val == "EXTRACTION_FAILED" else "Research methodology / technical approach section is missing (NOT_REPORTED)."
             findings.append(
                 CompletenessFindingRead(
                     field="methodology",
                     severity="ERROR",
-                    message="Research methodology / technical approach section is missing.",
+                    message=msg,
                 )
             )
 
@@ -64,25 +68,27 @@ class ProposalCompletenessService:
                 )
 
         # 2. Recommended Secondary Fields
-        if not proposal.problem_statement or len(proposal.problem_statement.strip()) < 15:
+        prob_val = (proposal.problem_statement or "").strip()
+        if not prob_val or prob_val == "NOT_REPORTED" or len(prob_val) < 15:
             missing_fields.append("problem_statement")
             warnings.append("Problem statement / background context is incomplete.")
             findings.append(
                 CompletenessFindingRead(
                     field="problem_statement",
                     severity="WARNING",
-                    message="Problem statement section could not be clearly identified.",
+                    message="Problem statement section could not be clearly identified (NOT_REPORTED).",
                 )
             )
 
-        if not proposal.expected_outcomes or len(proposal.expected_outcomes.strip()) < 15:
+        out_val = (proposal.expected_outcomes or "").strip()
+        if not out_val or out_val == "NOT_REPORTED" or len(out_val) < 15:
             missing_fields.append("expected_outcomes")
             warnings.append("Expected deliverables / R&D outcomes section is missing.")
             findings.append(
                 CompletenessFindingRead(
                     field="expected_outcomes",
                     severity="WARNING",
-                    message="Expected deliverables section is incomplete.",
+                    message="Expected deliverables section is incomplete (NOT_REPORTED).",
                 )
             )
 

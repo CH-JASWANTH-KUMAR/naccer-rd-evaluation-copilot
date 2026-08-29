@@ -11,11 +11,13 @@ from app.schemas.proposal import (
     ProposalRead,
     ProposalUpdate,
 )
+from app.schemas.proposal_scientific_comparison import ProposalScientificComparisonResponse
 from app.schemas.search import SimilaritySearchRequest, SimilaritySearchResponse
 from app.services.financial_compliance import FinancialComplianceService
 from app.services.historical_search_service import HistoricalProjectSearchService
 from app.services.proposal_completeness import ProposalCompletenessService
 from app.services.proposal_ingestion import ProposalIngestionService
+from app.services.proposal_scientific_comparison_service import ProposalScientificComparisonService
 from app.services.proposals import ProposalService
 
 router = APIRouter()
@@ -241,3 +243,54 @@ def find_similar_historical_projects_for_proposal(
 
     search_service = HistoricalProjectSearchService(db)
     return search_service.search_similar_projects(search_request)
+
+
+@router.post(
+    "/{proposal_id}/scientific-comparison",
+    response_model=ProposalScientificComparisonResponse,
+    summary="Generate multi-source proposal-to-literature scientific comparison",
+)
+def generate_proposal_scientific_comparison(
+    proposal_id: str,
+    db: Session = Depends(get_db),
+):
+    """Generate deterministic proposal vs historical CIL projects & research papers evidence comparison."""
+    repo = ProposalRepository(db)
+    proposal = repo.get_by_id(proposal_id)
+    if not proposal:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Proposal with ID '{proposal_id}' not found.",
+        )
+    comp_service = ProposalScientificComparisonService(db)
+    return comp_service.generate_comparison(proposal_id)
+
+
+@router.get("/{proposal_id}/scientific-comparison", summary="Get multi-source scientific evidence comparison")
+def get_scientific_comparison(proposal_id: str, db: Session = Depends(get_db)):
+    """Retrieve multi-source scientific comparison, evidence gaps, and reviewer questions."""
+    comp_service = ProposalScientificComparisonService(db)
+    return comp_service.generate_comparison(proposal_id)
+
+
+@router.get(
+    "/{proposal_id}/rubric-evaluation",
+    summary="Retrieve Guideline-to-Evidence Rubric Evaluation Matrix for proposal",
+)
+def get_proposal_rubric_evaluation(
+    proposal_id: str,
+    evaluation_id: str | None = None,
+    rubric_id: str | None = None,
+    db: Session = Depends(get_db),
+):
+    """Retrieve full Guideline-to-Evidence Evaluation Matrix connecting official MoC rubric criteria to proposal, historical, and scientific evidence."""
+    repo = ProposalRepository(db)
+    proposal = repo.get_by_id(proposal_id)
+    if not proposal:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Proposal with ID '{proposal_id}' not found.",
+        )
+    from app.services.rubric_evidence_engine import RubricEvidenceEngine
+    engine = RubricEvidenceEngine(db)
+    return engine.evaluate_proposal_rubric_matrix(proposal_id, evaluation_id=evaluation_id, rubric_id=rubric_id)

@@ -62,3 +62,20 @@ class CitationValidator:
         for term in cls.DISALLOWED_TERMS:
             if term in text_check:
                 raise ValueError(f"AI result contains prohibited autonomous decision term '{term}'.")
+
+    @classmethod
+    def is_valid_citation(cls, eid: str, valid_evidence_ids: set[str] | str) -> bool:
+        """Check if an evidence ID is in the set of valid registered RAG context evidence IDs or matches standard evidence prefixes."""
+        if isinstance(valid_evidence_ids, set) and len(valid_evidence_ids) > 0:
+            if eid in valid_evidence_ids or eid.startswith("PROP-"):
+                return True
+            parts = eid.split("-")
+            if len(parts) >= 3:
+                parent_id = "-".join(parts[:3])
+                if parent_id in valid_evidence_ids:
+                    return True
+            return False
+
+        if eid.startswith(("PROP-", "HIST-", "PAPER-", "COMP-", "FIN-", "Q-RUBRIC-", "Q-SCI-")):
+            return True
+        return False

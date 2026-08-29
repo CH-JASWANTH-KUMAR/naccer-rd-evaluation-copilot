@@ -152,58 +152,29 @@ class DocumentProcessingService:
             return self.doc_repo.get_by_id(doc_record.id)
 
     def _detect_sections(self, proposal_id: str, document_id: str, pages: list[tuple[int, str]]) -> dict[str, str]:
-        """Deterministic section detector using regex heading matching."""
+        """Deterministic section detector using offset-based section boundary parser."""
+        from app.services.proposal_section_parser import parse_proposal_sections
+
+        parsed_data = parse_proposal_sections(pages)
         detected_sections: dict[str, str] = {}
-        section_matches: list[dict] = []
-        seen_types: set[str] = set()
+        sec_dict = parsed_data["sections"]
 
-        for page_num, text in pages:
-            lines = text.split("\n")
-            for line in lines:
-                clean_line = line.strip()
-                if not clean_line or len(clean_line) > 80:
-                    continue
-
-                for section_type, pattern, title in SECTION_PATTERNS:
-                    if section_type in seen_types:
-                        continue
-                    if re.search(pattern, clean_line, re.IGNORECASE):
-                        seen_types.add(section_type)
-                        section_matches.append(
-                            {
-                                "type": section_type,
-                                "title": title,
-                                "page": page_num,
-                                "heading_line": clean_line,
-                            }
-                        )
-                        break
-
-        # Group page content into sections based on detected heading page boundaries
-        for idx, match in enumerate(section_matches):
-            start_page = match["page"]
-            end_page = section_matches[idx + 1]["page"] if idx + 1 < len(section_matches) else pages[-1][0]
-            if end_page < start_page:
-                end_page = start_page
-
-            content_parts = []
-            for p_num, p_text in pages:
-                if start_page <= p_num <= end_page:
-                    content_parts.append(p_text)
-
-            section_content = "\n\n".join(content_parts)
-            detected_sections[match["type"]] = section_content
-
-            self.doc_repo.add_section(
-                proposal_id=proposal_id,
-                document_id=document_id,
-                section_type=match["type"],
-                section_title=match["title"],
-                content=section_content,
-                start_page=start_page,
-                end_page=end_page,
-                confidence=1.0,
-            )
+        for key, s_res in sec_dict.items():
+            sec_type_upper = key.upper()
+            if s_res.status == "REPORTED":
+                detected_sections[sec_type_upper] = s_res.content
+                self.doc_repo.add_section(
+                    proposal_id=proposal_id,
+                    document_id=document_id,
+                    section_type=sec_type_upper,
+                    section_title=s_res.section_title,
+                    content=s_res.content,
+                    start_page=s_res.source_page_start,
+                    end_page=s_res.source_page_end,
+                    confidence=1.0 if s_res.extraction_confidence == "HIGH" else 0.5,
+                )
+            else:
+                detected_sections[sec_type_upper] = "NOT_REPORTED"
 
         return detected_sections
 

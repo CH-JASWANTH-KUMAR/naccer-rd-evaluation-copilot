@@ -328,3 +328,86 @@ class EvaluationService:
         )
         self.db.add(audit)
         self.db.commit()
+
+    def update_human_rubric_scores(self, evaluation_id: str, scores_data: list[dict]) -> EvaluationRead:
+        """Batch update human reviewer criterion scores and justification notes."""
+        evaluation = self.db.query(Evaluation).filter(Evaluation.id == evaluation_id).first()
+        if not evaluation:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Evaluation with ID '{evaluation_id}' not found.")
+
+        for item in scores_data:
+            crit_id = item.get("criterion_id")
+            score = item.get("score")
+            comments = item.get("comments")
+            justification = item.get("justification_notes")
+
+            crit = self.db.query(EvaluationCriterion).filter(
+                EvaluationCriterion.evaluation_id == evaluation_id,
+                (EvaluationCriterion.id == crit_id) | (EvaluationCriterion.criterion_key == item.get("criterion_key")),
+            ).first()
+
+            if crit:
+                prev_score = str(crit.score)
+                if score is not None:
+                    crit.score = float(score)
+                    crit.weighted_score = float(score) * crit.weight
+                if comments is not None:
+                    crit.comments = comments
+                if justification is not None:
+                    crit.justification_notes = justification
+
+                self._record_audit(
+                    evaluation_id=evaluation_id,
+                    actor_id=evaluation.reviewer_id,
+                    action="RUBRIC_SCORE_ENTERED",
+                    prev_val=prev_score,
+                    new_val=f"Score: {crit.score}, Justification: {(justification or '')[:50]}",
+                    criterion_id=crit.id,
+                )
+
+        self._recalculate_overall_score(evaluation)
+        self.db.commit()
+        return self.get_evaluation_by_id(evaluation_id)
+
+    def update_single_criterion_score(
+        self,
+        evaluation_id: str,
+        criterion_id: str,
+        score: float | None = None,
+        comments: str | None = None,
+        justification_notes: str | None = None,
+    ) -> EvaluationRead:
+        """Update score and justification for a single evaluation criterion."""
+        evaluation = self.db.query(Evaluation).filter(Evaluation.id == evaluation_id).first()
+        if not evaluation:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Evaluation with ID '{evaluation_id}' not found.")
+
+        crit = self.db.query(EvaluationCriterion).filter(
+            EvaluationCriterion.evaluation_id == evaluation_id,
+            (EvaluationCriterion.id == criterion_id) | (EvaluationCriterion.criterion_key == criterion_id),
+        ).first()
+
+        if not crit:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Criterion '{criterion_id}' not found.")
+
+        prev_score = str(crit.score)
+        if score is not None:
+            crit.score = float(score)
+            crit.weighted_score = float(score) * crit.weight
+        if comments is not None:
+            crit.comments = comments
+        if justification_notes is not None:
+            crit.justification_notes = justification_notes
+
+        self._record_audit(
+            evaluation_id=evaluation_id,
+            actor_id=evaluation.reviewer_id,
+            action="RUBRIC_CRITERION_UPDATED",
+            prev_val=prev_score,
+            new_val=f"Score: {crit.score}, Justification: {(justification_notes or '')[:50]}",
+            criterion_id=crit.id,
+        )
+
+        self._recalculate_overall_score(evaluation)
+        self.db.commit()
+        return self.get_evaluation_by_id(evaluation_id)

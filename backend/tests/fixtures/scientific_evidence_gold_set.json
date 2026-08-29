@@ -1,0 +1,91 @@
+{
+  "papers": [
+    {
+      "paper_filename": "synthetic_research_paper_predictive_maintenance.pdf",
+      "title": "Vibration and Temperature Telemetry for Failure Prediction in Coal Handling Conveyor Belts and Mining Equipment",
+      "authors": "Dr. Rajesh Sharma, Prof. Amit K. Patel, Dr. Sunita Rao",
+      "pages_count": 4,
+      "expected_metrics": [
+        {
+          "metric_name": "Precision",
+          "raw_value": "94.2%",
+          "normalized_value": 0.942,
+          "page": 3
+        },
+        {
+          "metric_name": "Recall",
+          "raw_value": "91.8%",
+          "normalized_value": 0.918,
+          "page": 3
+        },
+        {
+          "metric_name": "F1-score",
+          "raw_value": "0.930",
+          "normalized_value": 0.930,
+          "page": 3
+        }
+      ],
+      "expected_algorithms": ["LSTM", "Random Forest"],
+      "expected_dataset": "4.2 million time-series telemetry samples",
+      "expected_baselines": ["SVM", "FFT Spectral Analysis"],
+      "expected_early_warning_lead_time": "48 hours"
+    },
+    {
+      "paper_filename": "paper_coal_mine_dust_suppression.pdf",
+      "title": "Hydro-Dynamic Atomization and Ultrasonic Water Mist System for Dust Suppression in Continuous Mining Operations",
+      "authors": "Dr. Vikram Singh, Prof. Meera Banerjee",
+      "pages_count": 2,
+      "expected_metrics": [
+        {
+          "metric_name": "Respirable Dust Reduction",
+          "raw_value": "86.4%",
+          "normalized_value": 0.864,
+          "page": 2
+        },
+        {
+          "metric_name": "F1-score",
+          "raw_value": "0.885",
+          "normalized_value": 0.885,
+          "page": 2
+        }
+      ],
+      "expected_algorithms": ["Computational Fluid Dynamics", "Response Surface Methodology"],
+      "expected_baselines": ["Conventional Low-Pressure Spray Nozzles"]
+    },
+    {
+      "paper_filename": "paper_underground_roof_strata_monitoring.pdf",
+      "title": "Micro-Seismic Monitoring and Roof Fall Risk Prediction using Acoustic Emission Telemetry in Underground Coal Mines",
+      "authors": "Dr. K. V. Ramana, Dr. S. K. Roy",
+      "pages_count": 2,
+      "expected_metrics": [
+        {
+          "metric_name": "Accuracy",
+          "raw_value": "92.5%",
+          "normalized_value": 0.925,
+          "page": 2
+        },
+        {
+          "metric_name": "Precision",
+          "raw_value": "90.4%",
+          "normalized_value": 0.904,
+          "page": 2
+        },
+        {
+          "metric_name": "Recall",
+          "raw_value": "92.6%",
+          "normalized_value": 0.926,
+          "page": 2
+        },
+        {
+          "metric_name": "F1-score",
+          "raw_value": "0.915",
+          "normalized_value": 0.915,
+          "page": 2
+        }
+      ],
+      "expected_algorithms": ["Convolutional Neural Network", "Support Vector Regression"],
+      "expected_dataset": "1.8 million micro-seismic events",
+      "expected_early_warning_lead_time": "36 hours"
+    }
+  ]
+}

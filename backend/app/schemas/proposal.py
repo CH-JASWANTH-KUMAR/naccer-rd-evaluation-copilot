@@ -3,6 +3,7 @@ from datetime import datetime
 from pydantic import Field
 
 from app.schemas.common import ORMBase
+from app.schemas.document import StructuredSectionRead
 from app.schemas.institution import InstitutionRead
 
 
@@ -23,9 +24,11 @@ class ProposalCompletenessReportRead(ORMBase):
 class FinancialHeadBreakdownRead(ORMBase):
     cost_head: str
     proposed_amount: float
+    normalized_amount: float | None = None
     raw_amount_string: str | None = None
     compliance_status: str = "COMPLIANT"
     source_page: int | None = None
+    extraction_status: str = "EXTRACTED"
     notes: str | None = None
 
 
@@ -33,9 +36,13 @@ class FinancialComplianceReportRead(ORMBase):
     proposal_id: str
     status: str = Field(description="COMPLIANT, FLAGGED, or NEEDS_JUSTIFICATION")
     declared_total: float
-    calculated_total: float
-    arithmetic_mismatch: bool
-    difference_amount: float
+    calculated_total: float | None = None
+    arithmetic_status: str = Field(default="NOT_VERIFIABLE", description="MATCH, MISMATCH, or NOT_VERIFIABLE")
+    variance_amount: float | None = None
+    extraction_summary_status: str = Field(default="MISSING_BREAKDOWN", description="FULL_BREAKDOWN, PARTIAL_BREAKDOWN, or MISSING_BREAKDOWN")
+    explanation: str = ""
+    arithmetic_mismatch: bool = False
+    difference_amount: float = 0.0
     findings: list[FinancialHeadBreakdownRead] = Field(default_factory=list)
 
 
@@ -101,6 +108,10 @@ class ProposalRead(ORMBase):
     compliance_status: str
     processing_status: str
     processing_error: str | None = None
+    document_type: str | None = "R&D_PROPOSAL"
+    document_type_confidence: str | None = None
+    document_type_reasons: list[str] | None = None
+    structured_sections: list[StructuredSectionRead] = Field(default_factory=list)
     submission_date: datetime
     created_at: datetime
     updated_at: datetime

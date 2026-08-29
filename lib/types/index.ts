@@ -47,7 +47,23 @@ export interface Proposal {
   processingStatus?: string;
   processingError?: string;
   documentUrl?: string;
+  documentType?: "R&D_PROPOSAL" | "RESEARCH_PAPER" | "UNKNOWN" | string;
+  documentTypeConfidence?: "HIGH" | "MEDIUM" | "LOW" | string;
+  documentTypeReasons?: string[];
+  structuredSections?: StructuredDocumentSection[];
   keywords: string[];
+}
+
+export interface StructuredDocumentSection {
+  key: string;
+  displayTitle: string;
+  content: string;
+  summary: string;
+  status: "REPORTED" | "NOT_REPORTED" | "EMPTY" | "EXTRACTION_FAILED" | string;
+  sourcePageStart: number;
+  sourcePageEnd: number;
+  extractionConfidence: string;
+  evidenceId: string;
 }
 
 export interface HistoricalProject {
@@ -143,4 +159,29 @@ export interface Evaluation {
   financialChecks: FinancialCheck[];
   evidences: Evidence[];
   updatedAt: string;
+}
+
+export interface FinancialHeadBreakdown {
+  costHead: string;
+  proposedAmount: number;
+  normalizedAmount?: number;
+  rawAmountString?: string;
+  complianceStatus: string;
+  sourcePage?: number;
+  extractionStatus?: string;
+  notes?: string;
+}
+
+export interface FinancialComplianceReport {
+  proposalId: string;
+  status: "COMPLIANT" | "FLAGGED" | "NEEDS_JUSTIFICATION" | string;
+  declaredTotal: number;
+  calculatedTotal: number | null;
+  arithmeticStatus: "MATCH" | "MISMATCH" | "NOT_VERIFIABLE" | string;
+  varianceAmount: number | null;
+  extractionSummaryStatus: "FULL_BREAKDOWN" | "PARTIAL_BREAKDOWN" | "MISSING_BREAKDOWN" | string;
+  explanation: string;
+  arithmeticMismatch: boolean;
+  differenceAmount: number;
+  findings: FinancialHeadBreakdown[];
 }
