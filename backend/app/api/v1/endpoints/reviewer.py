@@ -3,6 +3,13 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.schemas.decision_coordination import (
+    ChairDashboardResponse,
+    DecisionBriefResponse,
+    DecisionReadinessCheck,
+    ReviewerWorkspaceQueue,
+)
+from app.services.decision_coordination_service import DecisionCoordinationService
 from app.services.reviewer_operations import ReviewerOperationsService
 
 router = APIRouter()
@@ -33,6 +40,48 @@ class FinalizeGovernancePayload(BaseModel):
     finalized_by: str
     recommendation: str  # FAVORABLE, FAVORABLE_WITH_CONDITIONS, REQUIRES_REVISION, NOT_RECOMMENDED
     note: str
+
+
+@router.get("/reviewer/workspace", summary="Get Reviewer Workspace Queue", response_model=ReviewerWorkspaceQueue)
+def get_reviewer_workspace(
+    reviewer_id: str = Query(..., description="Reviewer ID"),
+    db: Session = Depends(get_db),
+):
+    """Retrieve focused reviewer workspace queue grouped by pending, completed, and COI reviews."""
+    service = DecisionCoordinationService(db)
+    return service.get_reviewer_workspace(reviewer_id=reviewer_id)
+
+
+@router.get("/chair/dashboard", summary="Get Chair Coordination Dashboard", response_model=ChairDashboardResponse)
+def get_chair_coordination_dashboard(
+    role: str = Query("ADMIN", description="User role (ADMIN or CHAIR required)"),
+    db: Session = Depends(get_db),
+):
+    """Retrieve authorized Chair/Admin reviewer coordination dashboard displaying progress, consensus, and blockers."""
+    service = DecisionCoordinationService(db)
+    return service.get_chair_coordination_dashboard(requesting_user_role=role)
+
+
+@router.get("/proposals/{proposal_id}/decision-readiness", summary="Check Decision Readiness", response_model=DecisionReadinessCheck)
+def get_decision_readiness(
+    proposal_id: str,
+    db: Session = Depends(get_db),
+):
+    """Deterministically calculate proposal workflow decision readiness and return explicit blocking reasons."""
+    service = DecisionCoordinationService(db)
+    return service.calculate_decision_readiness(proposal_id=proposal_id)
+
+
+@router.get("/proposals/{proposal_id}/decision-brief", summary="Get Proposal Decision Brief", response_model=DecisionBriefResponse)
+def get_decision_brief(
+    proposal_id: str,
+    reviewer_id: str | None = Query(None, description="Requesting reviewer ID"),
+    role: str = Query("ADMIN", description="User role"),
+    db: Session = Depends(get_db),
+):
+    """Retrieve comprehensive decision-ready brief summarizing proposal, evidence, rubric, consensus, and outstanding actions."""
+    service = DecisionCoordinationService(db)
+    return service.get_decision_brief(proposal_id=proposal_id, requesting_user_id=reviewer_id, user_role=role)
 
 
 @router.get("/reviewer/queue", summary="Get reviewer assignment queue")

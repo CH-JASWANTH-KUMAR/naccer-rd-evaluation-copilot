@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { CheckSquare, Search, Plus, Loader2, ArrowRight } from "lucide-react";
+import { CheckSquare, Search, Loader2, ArrowRight } from "lucide-react";
 import { evaluationService, EvaluationDetail } from "@/lib/api/evaluations";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -10,8 +10,12 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
+import { ChairDashboardView } from "@/components/coordination/ChairDashboardView";
+import { ReviewerWorkspaceView } from "@/components/coordination/ReviewerWorkspaceView";
 
 export default function EvaluationsPage() {
+  const [viewMode, setViewMode] = useState<"chair" | "reviewer" | "list">("chair");
+  const [reviewerId] = useState("Rev-01");
   const [evaluations, setEvaluations] = useState<EvaluationDetail[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -79,25 +83,54 @@ export default function EvaluationsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Page Title */}
+      {/* Page Title & View Mode Switcher */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-200 pb-5">
         <div>
           <h1 className="text-xl font-bold text-slate-900 tracking-tight flex items-center space-x-2">
             <CheckSquare className="h-5 w-5 text-blue-600" />
-            <span>Human Reviewer Evaluation Workspace</span>
+            <span>Asynchronous Reviewer Coordination &amp; Governance</span>
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Configurable decision-support rubric evaluations, transparent score calculations, and evidence matrices.
+            Committee review coordination, reviewer workspace queues, score variance detection, and decision readiness.
           </p>
         </div>
 
-        <Link href="/proposals">
-          <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white">
-            <Plus className="h-4 w-4 mr-1.5" />
-            Start Proposal Evaluation
-          </Button>
-        </Link>
+        <div className="flex items-center space-x-1.5 bg-slate-100 p-1 rounded-lg text-xs font-medium">
+          <button
+            type="button"
+            onClick={() => setViewMode("chair")}
+            className={`px-3 py-1.5 rounded-md transition-all ${
+              viewMode === "chair" ? "bg-white shadow text-slate-900 font-bold" : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            Chair Dashboard
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode("reviewer")}
+            className={`px-3 py-1.5 rounded-md transition-all ${
+              viewMode === "reviewer" ? "bg-white shadow text-slate-900 font-bold" : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            Reviewer Queue
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode("list")}
+            className={`px-3 py-1.5 rounded-md transition-all ${
+              viewMode === "list" ? "bg-white shadow text-slate-900 font-bold" : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            Evaluation Register
+          </button>
+        </div>
       </div>
+
+      {viewMode === "chair" && <ChairDashboardView />}
+      {viewMode === "reviewer" && <ReviewerWorkspaceView reviewerId={reviewerId} />}
+
+      {viewMode === "list" && (
+        <>
 
       {/* Filter Bar */}
       <form
@@ -208,6 +241,8 @@ export default function EvaluationsPage() {
           )}
         </CardContent>
       </Card>
+        </>
+      )}
     </div>
   );
 }

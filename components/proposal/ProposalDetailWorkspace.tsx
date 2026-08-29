@@ -12,6 +12,7 @@ import { SimilarityResultItem } from "@/lib/api/projects";
 import { formatCurrency } from "@/lib/utils";
 import { ScientificEvidenceComparisonSection } from "@/components/proposal/ScientificEvidenceComparisonSection";
 import { EvaluationRubricSection } from "@/components/proposal/EvaluationRubricSection";
+import { DecisionBriefSection } from "@/components/coordination/DecisionBriefSection";
 
 interface ProposalDetailWorkspaceProps {
   initialProposal: Proposal;
@@ -19,7 +20,7 @@ interface ProposalDetailWorkspaceProps {
 
 export function ProposalDetailWorkspace({ initialProposal }: ProposalDetailWorkspaceProps) {
   const [proposal, setProposal] = useState<Proposal>(initialProposal);
-  const [activeTab, setActiveTab] = useState<"structured" | "completeness" | "financial" | "similar" | "scientific" | "rubric">("structured");
+  const [activeTab, setActiveTab] = useState<"brief" | "structured" | "completeness" | "financial" | "similar" | "scientific" | "rubric">("brief");
 
   const [completenessReport, setCompletenessReport] = useState<ProposalCompletenessReport | null>(null);
   const [complianceReport, setComplianceReport] = useState<FinancialComplianceReport | null>(null);
@@ -156,7 +157,18 @@ export function ProposalDetailWorkspace({ initialProposal }: ProposalDetailWorks
       </div>
 
       {/* Tab Navigation */}
-      <div className="flex items-center space-x-1 border-b border-slate-200 pb-2">
+      <div className="flex items-center space-x-1 border-b border-slate-200 pb-2 overflow-x-auto">
+        <button
+          type="button"
+          onClick={() => setActiveTab("brief")}
+          className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors flex items-center space-x-1.5 ${
+            activeTab === "brief" ? "bg-blue-50 text-blue-700 border border-blue-200" : "text-slate-600 hover:text-slate-900"
+          }`}
+        >
+          <Sparkles className="h-3.5 w-3.5 text-blue-600" />
+          <span>Decision-Ready Brief</span>
+        </button>
+
         <button
           type="button"
           onClick={() => setActiveTab("structured")}
@@ -226,6 +238,11 @@ export function ProposalDetailWorkspace({ initialProposal }: ProposalDetailWorks
           <span>Scientific Evidence Comparison</span>
         </button>
       </div>
+
+      {/* TAB 0: Decision-Ready Brief */}
+      {activeTab === "brief" && (
+        <DecisionBriefSection proposalId={proposal.id} />
+      )}
 
       {/* TAB 1: Structured Proposal & Source Provenance */}
       {activeTab === "structured" && (
