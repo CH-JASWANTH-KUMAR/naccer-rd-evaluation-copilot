@@ -13,32 +13,30 @@ STORAGE_DIR = Path(__file__).resolve().parent.parent.parent / "storage" / "docum
 MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB limit
 
 SECTION_PATTERNS = [
-    ("TITLE", r"^(?:1\.\s*)?(?:project|proposal)\s+title|(?:title)$", "Title"),
+    ("TITLE", r"^(?:\d+\.\s*)?(?:project|proposal)\s+title|^(?:title)\s*:?$", "Title"),
     (
         "PROBLEM_STATEMENT",
-        r"^(?:2\.\s*)?(?:background\s+and\s+)?problem\s+statement|statement\s+of\s+(?:the\s+)?problem",
+        r"^(?:\d+\.\s*)?(?:background\s+and\s+)?problem\s+statement|^statement\s+of\s+(?:the\s+)?problem",
         "Problem Statement",
     ),
-    ("OBJECTIVES", r"^(?:3\.\s*)?(?:research\s+|specific\s+)?objectives", "Objectives"),
+    ("OBJECTIVES", r"^(?:\d+\.\s*)?(?:research\s+|specific\s+|project\s+)?objectives", "Objectives"),
     (
         "LITERATURE_REVIEW",
-        r"^(?:4\.\s*)?(?:literature\s+review|review\s+of\s+literature|prior\s+work)",
+        r"^(?:\d+\.\s*)?(?:literature\s+review|review\s+of\s+literature|prior\s+work)",
         "Literature Review",
     ),
-    ("METHODOLOGY", r"^(?:5\.\s*)?(?:research\s+|proposed\s+)?methodology|technical\s+approach", "Methodology"),
-    (
-        "WORK_PLAN",
-        r"^(?:6\.\s*)?(?:work\s+plan|project\s+timeline|gantt\s+chart|implementation\s+schedule)",
-        "Work Plan",
-    ),
+    ("TECHNOLOGY", r"^(?:\d+\.\s*)?(?:technology\s+and\s+infrastructure|technology|hardware\s+and\s+software)", "Technology & Infrastructure"),
+    ("METHODOLOGY", r"^(?:\d+\.\s*)?(?:proposed\s+)?methodology|technical\s+approach", "Methodology"),
+    ("VALIDATION_PLAN", r"^(?:\d+\.\s*)?(?:experimental\s+)?validation\s+plan|testing\s+plan", "Experimental Validation Plan"),
     (
         "EXPECTED_OUTCOMES",
-        r"^(?:7\.\s*)?(?:expected\s+)?outcomes|expected\s+deliverables|expected\s+results",
+        r"^(?:\d+\.\s*)?(?:expected\s+)?outcomes(?:\s+and\s+deliverables)?|expected\s+deliverables|expected\s+results",
         "Expected Outcomes",
     ),
-    ("BUDGET", r"^(?:8\.\s*)?(?:estimated\s+)?budget|project\s+cost|cost\s+estimates|financial\s+breakdown", "Budget"),
-    ("MANPOWER", r"^(?:9\.\s*)?(?:manpower|project\s+team|personnel|human\s+resources)", "Manpower"),
-    ("EQUIPMENT", r"^(?:10\.\s*)?(?:equipment|facilities|infrastructure)", "Equipment"),
+    ("BUDGET", r"^(?:\d+\.\s*)?(?:project\s+budget|estimated\s+budget|project\s+cost|financial\s+breakdown)", "Budget"),
+    ("RISK_ANALYSIS", r"^(?:\d+\.\s*)?(?:risk\s+analysis|risk\s+assessment\s+and\s+mitigation)", "Risk Analysis"),
+    ("MANPOWER", r"^(?:\d+\.\s*)?(?:team\s+and\s+institutional\s+capability|manpower|project\s+team|personnel)", "Team Capability"),
+    ("REFERENCES", r"^(?:\d+\.\s*)?(?:references|citations|bibliography)", "References"),
 ]
 
 
@@ -157,16 +155,20 @@ class DocumentProcessingService:
         """Deterministic section detector using regex heading matching."""
         detected_sections: dict[str, str] = {}
         section_matches: list[dict] = []
+        seen_types: set[str] = set()
 
         for page_num, text in pages:
             lines = text.split("\n")
             for line in lines:
                 clean_line = line.strip()
-                if not clean_line or len(clean_line) > 100:
+                if not clean_line or len(clean_line) > 80:
                     continue
 
                 for section_type, pattern, title in SECTION_PATTERNS:
+                    if section_type in seen_types:
+                        continue
                     if re.search(pattern, clean_line, re.IGNORECASE):
+                        seen_types.add(section_type)
                         section_matches.append(
                             {
                                 "type": section_type,

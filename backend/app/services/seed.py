@@ -6,17 +6,21 @@ from app.repositories.proposals import ProposalRepository
 from app.schemas.institution import InstitutionCreate
 from app.schemas.project import HistoricalProjectCreate
 from app.schemas.proposal import ProposalCreate
+from app.services.cil_catalogue_corpus import seed_cil_ongoing_projects_corpus
 
 
 def seed_demo_data(db: Session) -> dict:
-    """Populate database with clearly marked development-only DEMO DATA."""
+    """Populate database with CIL project catalogue corpus and development demo data."""
     inst_repo = InstitutionRepository(db)
     prop_repo = ProposalRepository(db)
     proj_repo = HistoricalProjectRepository(db)
 
-    # Check if data already exists
+    # 0. Always seed CIL Ongoing Projects Catalogue Corpus
+    corpus_res = seed_cil_ongoing_projects_corpus(db)
+
+    # Check if demo data already exists
     if len(inst_repo.get_all()) > 0:
-        return {"message": "Database already contains data. Seed skipped."}
+        return {"message": "CIL corpus seeded. Institution demo data already exists.", "corpus": corpus_res}
 
     # 1. Create Institutions (DEMO DATA)
     inst1 = inst_repo.create(

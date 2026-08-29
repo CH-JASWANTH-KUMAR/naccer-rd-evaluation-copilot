@@ -22,7 +22,10 @@ class ProposalCompletenessReportRead(ORMBase):
 
 class FinancialHeadBreakdownRead(ORMBase):
     cost_head: str
-    amount: float
+    proposed_amount: float
+    raw_amount_string: str | None = None
+    compliance_status: str = "COMPLIANT"
+    source_page: int | None = None
     notes: str | None = None
 
 
@@ -33,13 +36,14 @@ class FinancialComplianceReportRead(ORMBase):
     calculated_total: float
     arithmetic_mismatch: bool
     difference_amount: float
-    findings: list[dict] = Field(default_factory=list)
+    findings: list[FinancialHeadBreakdownRead] = Field(default_factory=list)
 
 
 class ProposalCreate(ORMBase):
     title: str
     institution_id: str
     principal_investigator: str
+    extracted_principal_investigator: str | None = None
     domain: str
     problem_statement: str | None = None
     objectives: str | None = None
@@ -51,12 +55,14 @@ class ProposalCreate(ORMBase):
     duration_months: int | None = 12
     status: str = "UNDER_REVIEW"
     priority: str = "MEDIUM"
-    budget_total: float = 0.0
+    budget_total: float | None = None
+    raw_budget_text: str | None = None
 
 
 class ProposalUpdate(ORMBase):
     title: str | None = None
     principal_investigator: str | None = None
+    extracted_principal_investigator: str | None = None
     domain: str | None = None
     problem_statement: str | None = None
     objectives: str | None = None
@@ -67,6 +73,7 @@ class ProposalUpdate(ORMBase):
     status: str | None = None
     priority: str | None = None
     budget_total: float | None = None
+    raw_budget_text: str | None = None
 
 
 class ProposalRead(ORMBase):
@@ -76,6 +83,7 @@ class ProposalRead(ORMBase):
     institution_id: str
     institution: InstitutionRead | None = None
     principal_investigator: str
+    extracted_principal_investigator: str | None = None
     domain: str
     problem_statement: str | None = None
     objectives: str | None = None
@@ -87,7 +95,8 @@ class ProposalRead(ORMBase):
     duration_months: int | None = 12
     status: str
     priority: str
-    budget_total: float
+    budget_total: float | None = None
+    raw_budget_text: str | None = None
     completeness_status: str
     compliance_status: str
     processing_status: str

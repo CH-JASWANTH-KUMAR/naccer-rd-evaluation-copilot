@@ -40,7 +40,7 @@ class ProposalCompletenessService:
                 )
             )
 
-        if proposal.budget_total <= 0:
+        if proposal.budget_total is None or proposal.budget_total <= 0:
             missing_fields.append("budget_total")
             findings.append(
                 CompletenessFindingRead(
@@ -49,6 +49,19 @@ class ProposalCompletenessService:
                     message="Total requested budget is zero or unspecified.",
                 )
             )
+
+        if proposal.extracted_principal_investigator and proposal.principal_investigator:
+            admin_pi = proposal.principal_investigator.strip()
+            doc_pi = proposal.extracted_principal_investigator.strip()
+            if admin_pi.lower() not in doc_pi.lower() and doc_pi.lower() not in admin_pi.lower():
+                warnings.append("Administrative metadata PI differs from document-extracted PI.")
+                findings.append(
+                    CompletenessFindingRead(
+                        field="principal_investigator",
+                        severity="WARNING",
+                        message=f"Administrative metadata PI ({admin_pi}) differs from document-extracted PI ({doc_pi}).",
+                    )
+                )
 
         # 2. Recommended Secondary Fields
         if not proposal.problem_statement or len(proposal.problem_statement.strip()) < 15:

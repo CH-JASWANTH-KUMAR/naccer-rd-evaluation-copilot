@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { evaluationService, EvaluationDetail } from "@/lib/api/evaluations";
 import { AIEvidenceAnalysisTab } from "./AIEvidenceAnalysisTab";
-
+import { ConsensusComparisonTab } from "./ConsensusComparisonTab";
 import { DecisionPackTab } from "./DecisionPackTab";
 
 interface EvaluationDetailWorkspaceProps {
@@ -19,7 +19,7 @@ interface EvaluationDetailWorkspaceProps {
 
 export function EvaluationDetailWorkspace({ initialEvaluation }: EvaluationDetailWorkspaceProps) {
   const [evaluation, setEvaluation] = useState<EvaluationDetail>(initialEvaluation);
-  const [activeTab, setActiveTab] = useState<"rubric" | "ai_analysis" | "decision_pack">("rubric");
+  const [activeTab, setActiveTab] = useState<"rubric" | "ai_analysis" | "consensus" | "decision_pack">("rubric");
 
   // Draft Form States
   const [criteriaScores, setCriteriaScores] = useState<Record<string, { score: number; comments: string; justification: string }>>(
@@ -236,6 +236,21 @@ export function EvaluationDetailWorkspace({ initialEvaluation }: EvaluationDetai
         </button>
         <button
           type="button"
+          onClick={() => setActiveTab("consensus")}
+          className={`pb-2.5 text-xs font-bold border-b-2 flex items-center space-x-2 transition-colors ${
+            activeTab === "consensus"
+              ? "border-blue-600 text-blue-600"
+              : "border-transparent text-slate-500 hover:text-slate-700"
+          }`}
+        >
+          <Layers className="h-4 w-4 text-indigo-600" />
+          <span>Multi-Reviewer Consensus</span>
+          <Badge variant="secondary" className="text-[9px] px-1.5 py-0 bg-indigo-50 text-indigo-700">
+            P1.1
+          </Badge>
+        </button>
+        <button
+          type="button"
           onClick={() => setActiveTab("decision_pack")}
           className={`pb-2.5 text-xs font-bold border-b-2 flex items-center space-x-2 transition-colors ${
             activeTab === "decision_pack"
@@ -259,6 +274,8 @@ export function EvaluationDetailWorkspace({ initialEvaluation }: EvaluationDetai
             setReviewerSummary((prev) => (prev ? `${prev}\n\nReviewer Question: ${questionText}` : `Reviewer Question: ${questionText}`));
           }}
         />
+      ) : activeTab === "consensus" ? (
+        <ConsensusComparisonTab evaluationId={evaluation.id} />
       ) : activeTab === "decision_pack" ? (
         <DecisionPackTab evaluationId={evaluation.id} />
       ) : (

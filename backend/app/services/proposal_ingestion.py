@@ -28,9 +28,11 @@ class ProposalIngestionService:
     def ingest_proposal_pdf(
         self,
         file: UploadFile,
+        title: str | None = None,
         institution_id: str | None = None,
         principal_investigator: str = "Dr. R. K. Verma",
         domain: str = "Mine Safety & Ventilation",
+        budget_total: float | None = None,
     ) -> ProposalRead:
         filename = file.filename or "proposal.pdf"
         if not filename.lower().endswith(".pdf"):
@@ -72,11 +74,13 @@ class ProposalIngestionService:
                 return ProposalRead.model_validate(existing_prop)
 
         # 3. Create Initial Proposal Record
+        initial_title = title.strip() if title and title.strip() else f"Uploaded Proposal: {filename}"
         proposal = Proposal(
-            title=f"Uploaded Proposal: {filename}",
+            title=initial_title,
             institution_id=inst.id,
             principal_investigator=principal_investigator,
             domain=domain,
+            budget_total=budget_total or 0.0,
             status="UNDER_REVIEW",
             processing_status="EXTRACTING",
         )
@@ -104,29 +108,39 @@ class ProposalIngestionService:
         self.db.refresh(doc)
 
         # 5. Extract Pages via pypdf
-        reader = pypdf.PdfReader(storage_path)
-        page_count = len(reader.pages)
-        doc.page_count = page_count
-
         pages_text: list[tuple[int, str]] = []
-        for idx, page in enumerate(reader.pages, start=1):
-            txt = page.extract_text() or ""
-            doc_page = DocumentPage(
-                document_id=doc.id,
-                page_number=idx,
-                text=txt,
-            )
-            self.db.add(doc_page)
-            pages_text.append((idx, txt))
+        try:
+            reader = pypdf.PdfReader(storage_path)
+            page_count = len(reader.pages)
+            doc.page_count = page_count
 
-        self.db.commit()
+            for idx, page in enumerate(reader.pages, start=1):
+                txt = page.extract_text() or ""
+                doc_page = DocumentPage(
+                    document_id=doc.id,
+                    page_number=idx,
+                    text=txt,
+                )
+                self.db.add(doc_page)
+                pages_text.append((idx, txt))
+            self.db.commit()
+        except Exception as exc:
+            doc.processing_status = "FAILED"
+            doc.processing_error = f"Unable to parse PDF document: {exc}"
+            self.db.commit()
 
         # 6. Section Parsing & Field Extraction
         extracted_fields, sections = self._extract_proposal_sections(pages_text, doc.id, proposal.id)
 
-        # Populate Proposal Fields
-        if extracted_fields.get("title"):
+        # Populate Proposal Fields (prioritizing explicit user input if provided)
+        if not title and extracted_fields.get("title"):
             proposal.title = extracted_fields["title"][:500]
+        if extracted_fields.get("principal_investigator"):
+            proposal.extracted_principal_investigator = extracted_fields["principal_investigator"]
+        if extracted_fields.get("raw_budget_text"):
+            proposal.raw_budget_text = extracted_fields["raw_budget_text"]
+        if (proposal.budget_total is None or proposal.budget_total <= 0) and extracted_fields.get("budget_total"):
+            proposal.budget_total = extracted_fields["budget_total"]
         if extracted_fields.get("problem_statement"):
             proposal.problem_statement = extracted_fields["problem_statement"]
         if extracted_fields.get("objectives"):
@@ -137,8 +151,6 @@ class ProposalIngestionService:
             proposal.technology = extracted_fields["technology"]
         if extracted_fields.get("expected_outcomes"):
             proposal.expected_outcomes = extracted_fields["expected_outcomes"]
-        if extracted_fields.get("budget_total"):
-            proposal.budget_total = extracted_fields["budget_total"]
         if extracted_fields.get("duration_months"):
             proposal.duration_months = extracted_fields["duration_months"]
 
@@ -191,10 +203,22 @@ class ProposalIngestionService:
 
         # 1. Extract Title
         title_match = re.search(
-            r"(?:Title|Project Title|Name of Project)\s*:?\s*([^\n]+(?:\n[^\n]+){0,2})", full_text, re.IGNORECASE
+            r"(?:Title|Project Title|Name of Project)\s*:?\s*([^\n]+)", full_text, re.IGNORECASE
         )
         if title_match:
-            extracted["title"] = title_match.group(1).replace("\n", " ").strip()
+            clean_title = title_match.group(1).replace("\n", " ").strip()
+            # Strip trailing filename patterns or extensions if appended
+            clean_title = re.sub(r"synthetic_rd_proposal_[a-z0-9_]+(?:\.pdf)?", "", clean_title, flags=re.IGNORECASE).strip()
+            extracted["title"] = clean_title
+
+        # Extract Principal Investigator
+        pi_match = re.search(
+            r"(?:Principal Investigator|\bPI\b)\s*:?\s*([^\n]+)", full_text, re.IGNORECASE
+        )
+        if pi_match:
+            clean_pi = pi_match.group(1).replace("\n", " ").strip()
+            clean_pi = re.sub(r",\s*Senior Principal Scientist.*$", "", clean_pi, flags=re.IGNORECASE).strip()
+            extracted["principal_investigator"] = clean_pi
 
         # 2. Extract Objectives
         obj_match = re.search(
@@ -265,12 +289,13 @@ class ProposalIngestionService:
 
         # 7. Extract Budget
         budget_match = re.search(
-            r"(?:Total Budget|Estimated Cost|Project Cost|Total Outlay|Proposed Budget)\s*:?\s*(Rs\.?\s*[\d\.\,]+\s*(?:Lakhs?|Crores?|INR)?)",
+            r"(?:Total Requested Budget|Total Budget|Estimated Cost|Project Cost|Total Outlay|Proposed Budget)\s*:?\s*(Rs\.?\s*[\d\.\,]+\s*(?:Lakhs?|Crores?|INR)?)",
             full_text,
             re.IGNORECASE,
         )
         if budget_match:
             raw_b = budget_match.group(1).strip()
+            extracted["raw_budget_text"] = raw_b
             extracted["budget_total"] = FinancialComplianceService._parse_currency(raw_b)
 
         return extracted, sections

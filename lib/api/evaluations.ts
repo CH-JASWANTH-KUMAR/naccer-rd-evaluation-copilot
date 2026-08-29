@@ -509,4 +509,26 @@ export const evaluationService = {
     if (!res.ok) throw new Error("Failed to check system readiness");
     return await res.json();
   },
+
+  async getReviewerComparison(evaluationId: string): Promise<Record<string, unknown>> {
+    const res = await fetch(`${appConfig.apiBaseUrl}/evaluations/${evaluationId}/reviewer-comparison`, { cache: "no-store" });
+    if (!res.ok) {
+      const errPayload = await res.json().catch(() => ({}));
+      throw new Error(errPayload.detail || "Failed to load reviewer comparison");
+    }
+    return await res.json();
+  },
+
+  async finalizeGovernance(evaluationId: string, recommendation: string, note: string): Promise<Record<string, unknown>> {
+    const res = await fetch(`${appConfig.apiBaseUrl}/evaluations/${evaluationId}/finalize-governance`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ finalized_by: "Governance Chair", recommendation, note }),
+    });
+    if (!res.ok) {
+      const errPayload = await res.json().catch(() => ({}));
+      throw new Error(errPayload.detail || "Failed to finalize governance record");
+    }
+    return await res.json();
+  },
 };

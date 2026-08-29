@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -29,18 +29,22 @@ router = APIRouter()
 )
 def upload_proposal_pdf(
     file: UploadFile = File(...),
-    institution_id: str | None = Query(None, description="Submitting institution ID"),
-    principal_investigator: str = Query("Dr. R. K. Verma", description="Principal Investigator"),
-    domain: str = Query("Mine Safety & Ventilation", description="Research Domain"),
+    title: str | None = Form(None, description="Full Project Title"),
+    institution_id: str | None = Form(None, description="Submitting institution ID"),
+    principal_investigator: str = Form("Dr. R. K. Verma", description="Principal Investigator"),
+    domain: str = Form("Mine Safety & Ventilation", description="Research Domain"),
+    budget_total: float | None = Form(None, description="Proposed Budget Total"),
     db: Session = Depends(get_db),
 ):
     """Upload proposal PDF, validate document, extract sections, and run preliminary completeness & compliance engines."""
     ingestion_service = ProposalIngestionService(db)
     return ingestion_service.ingest_proposal_pdf(
         file=file,
+        title=title,
         institution_id=institution_id,
         principal_investigator=principal_investigator,
         domain=domain,
+        budget_total=budget_total,
     )
 
 
@@ -55,7 +59,7 @@ def create_proposal(
     db: Session = Depends(get_db),
 ):
     """Create a structured proposal record."""
-    if data.budget_total < 0:
+    if data.budget_total is not None and data.budget_total < 0:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Budget total cannot be negative.",

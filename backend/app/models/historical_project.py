@@ -19,6 +19,7 @@ class HistoricalProject(Base):
     project_code: Mapped[str] = mapped_column(String(100), nullable=False, unique=True, index=True)
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     institution: Mapped[str] = mapped_column(String(255), nullable=False)
+    sub_implementing_agencies: Mapped[str | None] = mapped_column(String(500), nullable=True)
     domain: Mapped[str] = mapped_column(String(255), nullable=False)
 
     objectives: Mapped[str | None] = mapped_column(Text, nullable=True)

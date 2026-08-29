@@ -58,7 +58,8 @@ export default function UploadProposalPage() {
       setErrorMessage(null);
       setSelectedFile(file);
       if (!title) {
-        setTitle(file.name.replace(/\.pdf$/i, ""));
+        const cleanName = file.name.replace(/\.pdf$/i, "").replace(/^[a-z0-9_]+_/i, "").replace(/_/g, " ");
+        setTitle(cleanName.charAt(0).toUpperCase() + cleanName.slice(1));
       }
     }
   };
@@ -81,15 +82,34 @@ export default function UploadProposalPage() {
     try {
       const formData = new FormData();
       formData.append("file", selectedFile);
+      formData.append("title", title);
       formData.append("principal_investigator", piName);
       formData.append("domain", domain);
       if (institutionId) formData.append("institution_id", institutionId);
+      if (budget) formData.append("budget_total", budget);
 
       const newProposal = await proposalService.uploadProposalPdf(formData);
       setCreatedProposalId(newProposal.id);
 
-      const docResult = await documentService.uploadDocument(newProposal.id, selectedFile);
-      setProcessedDoc(docResult);
+      const docs = await documentService.getProposalDocuments(newProposal.id);
+      if (docs && docs.length > 0) {
+        setProcessedDoc(docs[0]);
+      } else {
+        setProcessedDoc({
+          id: newProposal.id,
+          proposal_id: newProposal.id,
+          filename: selectedFile.name,
+          file_type: "application/pdf",
+          file_size: selectedFile.size,
+          storage_path: "",
+          processing_status: (newProposal.processingStatus as "PROCESSED" | "UPLOADED" | "PROCESSING" | "FAILED") || "PROCESSED",
+          processing_error: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          pages_count: 1,
+          sections_count: 1,
+        });
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to process proposal document.";
       setErrorMessage(message);

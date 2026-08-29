@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { FileText, CheckCircle2, AlertTriangle, AlertCircle, Sparkles, RefreshCw, ArrowRight, DollarSign, Layers } from "lucide-react";
+import { FileText, CheckCircle2, AlertTriangle, AlertCircle, Sparkles, RefreshCw, ArrowRight, DollarSign } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -198,55 +198,78 @@ export function ProposalDetailWorkspace({ initialProposal }: ProposalDetailWorks
       {/* TAB 1: Structured Proposal & Source Provenance */}
       {activeTab === "structured" && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <Card className="lg:col-span-2 space-y-4 p-6">
-            <div className="space-y-4 text-xs">
-              <div className="p-4 bg-slate-50 rounded-md border border-slate-200 space-y-1">
-                <span className="text-[10px] font-mono text-slate-400 uppercase block">Problem Statement</span>
-                <p className="text-slate-800 leading-relaxed whitespace-pre-wrap">
-                  {proposal.problemStatement || "Section not extracted or missing in proposal PDF."}
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <CardTitle className="text-sm">Structured Proposal Fields &amp; Sections</CardTitle>
+              <CardDescription className="text-xs">
+                Parsed section fields extracted from PDF proposal document.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4 text-xs">
+              <div>
+                <span className="font-mono text-[10px] uppercase font-semibold text-slate-400 block mb-1">
+                  Problem Statement &amp; Research Gap
+                </span>
+                <p className="text-slate-700 bg-slate-50 p-3 rounded border border-slate-200 whitespace-pre-wrap">
+                  {proposal.problemStatement || "Section text not extracted."}
                 </p>
               </div>
 
-              <div className="p-4 bg-slate-50 rounded-md border border-slate-200 space-y-1">
-                <span className="text-[10px] font-mono text-slate-400 uppercase block">Technical Objectives</span>
-                <p className="text-slate-800 leading-relaxed whitespace-pre-wrap">
-                  {proposal.objectives || "Section not extracted or missing in proposal PDF."}
+              <div>
+                <span className="font-mono text-[10px] uppercase font-semibold text-slate-400 block mb-1">
+                  Project Objectives
+                </span>
+                <p className="text-slate-700 bg-slate-50 p-3 rounded border border-slate-200 whitespace-pre-wrap">
+                  {proposal.objectives || "Section text not extracted."}
                 </p>
               </div>
 
-              <div className="p-4 bg-slate-50 rounded-md border border-slate-200 space-y-1">
-                <span className="text-[10px] font-mono text-slate-400 uppercase block">Proposed Research Methodology</span>
-                <p className="text-slate-800 leading-relaxed whitespace-pre-wrap">
-                  {proposal.methodology || "Section not extracted or missing in proposal PDF."}
+              <div>
+                <span className="font-mono text-[10px] uppercase font-semibold text-slate-400 block mb-1">
+                  Technology &amp; Infrastructure
+                </span>
+                <p className="text-slate-700 bg-slate-50 p-3 rounded border border-slate-200 whitespace-pre-wrap">
+                  {proposal.technology || "Section text not extracted."}
                 </p>
               </div>
 
-              <div className="p-4 bg-slate-50 rounded-md border border-slate-200 space-y-1">
-                <span className="text-[10px] font-mono text-slate-400 uppercase block">Expected Outcomes &amp; Deliverables</span>
-                <p className="text-slate-800 leading-relaxed whitespace-pre-wrap">
-                  {proposal.expectedOutcomes || "Section not extracted or missing in proposal PDF."}
+              <div>
+                <span className="font-mono text-[10px] uppercase font-semibold text-slate-400 block mb-1">
+                  Proposed Methodology
+                </span>
+                <p className="text-slate-700 bg-slate-50 p-3 rounded border border-slate-200 whitespace-pre-wrap">
+                  {proposal.methodology || "Section text not extracted."}
                 </p>
               </div>
-            </div>
+
+              <div>
+                <span className="font-mono text-[10px] uppercase font-semibold text-slate-400 block mb-1">
+                  Expected Outcomes &amp; Deliverables
+                </span>
+                <p className="text-slate-700 bg-slate-50 p-3 rounded border border-slate-200 whitespace-pre-wrap">
+                  {proposal.expectedOutcomes || "Section text not extracted."}
+                </p>
+              </div>
+            </CardContent>
           </Card>
 
-          {/* Right Panel: Source Document Page Provenance */}
-          <Card className="lg:col-span-1">
-            <CardHeader className="pb-3 border-b border-slate-200">
-              <CardTitle className="text-sm flex items-center space-x-2">
-                <Layers className="h-4 w-4 text-blue-600" />
-                <span>Source Document Provenance</span>
-              </CardTitle>
+          {/* Page Provenance Panel */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Document Page Provenance</CardTitle>
+              <CardDescription className="text-xs">
+                Page-by-page audit trace of source proposal PDF.
+              </CardDescription>
             </CardHeader>
-            <CardContent className="p-4 space-y-3 text-xs">
+            <CardContent className="space-y-3 text-xs">
               {sourceProvenance && sourceProvenance.documents.length > 0 ? (
                 sourceProvenance.documents.map((doc) => (
                   <div key={doc.documentId} className="space-y-2">
                     <div className="p-2.5 bg-slate-50 rounded border border-slate-200 space-y-1">
-                      <span className="font-bold text-slate-900 block truncate">{doc.filename}</span>
-                      <p className="text-[10px] font-mono text-slate-500">
-                        Pages: {doc.pageCount} • Size: {(doc.fileSize / 1024).toFixed(1)} KB
-                      </p>
+                      <span className="font-semibold text-slate-800 block truncate">{doc.filename}</span>
+                      <span className="text-[10px] font-mono text-slate-500 block">
+                        {doc.pageCount} Pages • {(doc.fileSize / 1024).toFixed(1)} KB
+                      </span>
                       {doc.documentHash && (
                         <p className="text-[9px] font-mono text-slate-400 truncate">
                           SHA-256: {doc.documentHash}
@@ -357,12 +380,24 @@ export function ProposalDetailWorkspace({ initialProposal }: ProposalDetailWorks
                 </div>
 
                 <div className="space-y-2">
-                  <h4 className="text-xs font-semibold text-slate-800 uppercase">Cost Head Findings</h4>
+                  <h4 className="text-xs font-semibold text-slate-800 uppercase">Cost Head Findings &amp; Itemized Breakdown</h4>
                   {complianceReport.findings.map((f, idx) => (
                     <div key={idx} className="p-3 bg-white border border-slate-200 rounded text-xs space-y-1">
                       <div className="flex items-center justify-between">
-                        <span className="font-bold text-slate-900">{f.costHead}</span>
-                        <span className="font-mono font-bold text-slate-800">{formatCurrency(f.proposedAmount)}</span>
+                        <div className="flex items-center space-x-2">
+                          <span className="font-bold text-slate-900">{f.costHead}</span>
+                          {f.sourcePage && (
+                            <Badge variant="outline" className="font-mono text-[10px]">
+                              Page {f.sourcePage}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="text-right">
+                          <span className="font-mono font-bold text-slate-800 block">{formatCurrency(f.proposedAmount)}</span>
+                          {f.rawAmountString && (
+                            <span className="text-[10px] font-mono text-slate-500 block">{f.rawAmountString}</span>
+                          )}
+                        </div>
                       </div>
                       {f.notes && <p className="text-slate-600 text-[11px]">{f.notes}</p>}
                     </div>

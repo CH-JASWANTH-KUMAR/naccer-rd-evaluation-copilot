@@ -84,8 +84,8 @@ class HistoricalProjectSearchService:
             else:
                 relationship = "WEAK_RELATIONSHIP"
 
-            # Extract Evidence Items & Matched Fields
-            matched_fields, evidence_items = self._extract_evidence(request, proj, final_score)
+            # Extract Evidence Items, Matched Fields & Technical Dimensions
+            matched_fields, matched_dimensions, evidence_items = self._extract_evidence(request, proj, final_score)
 
             # Build Provenance Record
             provenance = ProvenanceRead(
@@ -104,8 +104,10 @@ class HistoricalProjectSearchService:
                 SimilarityResultItem(
                     project_id=proj.id,
                     project_code=proj.project_code,
+                    evidence_id="HIST-000",  # Updated after sorting top-K
                     project_title=proj.title,
                     institution=proj.institution,
+                    sub_implementing_agencies=proj.sub_implementing_agencies,
                     domain=proj.domain,
                     status=proj.status,
                     approved_cost=proj.approved_cost,
@@ -114,6 +116,7 @@ class HistoricalProjectSearchService:
                     similarity_percentage=similarity_pct,
                     relationship=relationship,
                     matched_fields=matched_fields,
+                    matched_dimensions=matched_dimensions,
                     evidence=evidence_items,
                     provenance=provenance,
                     summary=proj.objectives or proj.raw_record_text,
@@ -124,6 +127,10 @@ class HistoricalProjectSearchService:
         # Sort descending by similarity score
         results.sort(key=lambda r: r.similarity_score, reverse=True)
         top_results = results[: request.top_k]
+
+        # Assign deterministic Evidence IDs (HIST-001, HIST-002, etc.)
+        for idx, item in enumerate(top_results, start=1):
+            item.evidence_id = f"HIST-{idx:03d}"
 
         return SimilaritySearchResponse(
             query_summary={
@@ -211,12 +218,18 @@ class HistoricalProjectSearchService:
 
     def _extract_evidence(
         self, request: SimilaritySearchRequest, proj: HistoricalProject, score: float
-    ) -> tuple[list[str], list[EvidenceItemRead]]:
+    ) -> tuple[list[str], list[str], list[EvidenceItemRead]]:
         matched_fields: list[str] = []
+        matched_dimensions: list[str] = []
         evidence_items: list[EvidenceItemRead] = []
 
         q_tokens = self._extract_tokens(self._build_combined_query_text(request))
         strength = "DIRECT_MATCH" if score >= 0.65 else ("RELATED" if score >= 0.35 else "WEAKLY_RELATED")
+
+        mining_keywords = {
+            "coal", "mining", "equipment", "underground", "opencast", "sensor", "telemetry", "monitoring",
+            "longwall", "continuous", "maintenance", "fire", "gas", "5g", "iot", "predictive", "strata", "paste"
+        }
 
         # 1. Objective / Record Text Evidence
         if proj.objectives or proj.raw_record_text:
@@ -225,6 +238,7 @@ class HistoricalProjectSearchService:
             overlap = q_tokens.intersection(rec_tokens)
             if overlap:
                 matched_fields.append("objective")
+                matched_dimensions.append("objective")
                 sample_terms = ", ".join(list(overlap)[:4])
                 snippet = rec_text[:200] + ("..." if len(rec_text) > 200 else "")
                 evidence_items.append(
@@ -241,6 +255,7 @@ class HistoricalProjectSearchService:
             request.technology and request.technology.lower() in (proj.raw_record_text or "").lower()
         ):
             matched_fields.append("technology")
+            matched_dimensions.append("technology")
             tech_str = proj.technology or "Specified R&D Tech Stack"
             evidence_items.append(
                 EvidenceItemRead(
@@ -254,6 +269,7 @@ class HistoricalProjectSearchService:
         # 3. Domain Evidence
         if request.domain and request.domain.lower() in proj.domain.lower():
             matched_fields.append("domain")
+            matched_dimensions.append("domain")
             evidence_items.append(
                 EvidenceItemRead(
                     field="domain",
@@ -268,6 +284,7 @@ class HistoricalProjectSearchService:
         if q_tokens.intersection(t_tokens):
             if "title" not in matched_fields:
                 matched_fields.append("title")
+                matched_dimensions.append("title")
             evidence_items.append(
                 EvidenceItemRead(
                     field="title",
@@ -277,4 +294,12 @@ class HistoricalProjectSearchService:
                 )
             )
 
-        return matched_fields, evidence_items
+        # 5. Mining Context Dimension Check
+        all_doc_text = f"{proj.title} {proj.domain} {proj.objectives or ''} {proj.technology or ''}".lower()
+        doc_mining_tokens = self._extract_tokens(all_doc_text).intersection(mining_keywords)
+        query_mining_tokens = q_tokens.intersection(mining_keywords)
+        if query_mining_tokens.intersection(doc_mining_tokens):
+            if "mining_context" not in matched_dimensions:
+                matched_dimensions.append("mining_context")
+
+        return matched_fields, matched_dimensions, evidence_items

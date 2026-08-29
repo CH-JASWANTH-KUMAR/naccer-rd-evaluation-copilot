@@ -18,6 +18,23 @@ class ReturnForRevisionPayload(BaseModel):
     reason: str
 
 
+class DeclareConflictPayload(BaseModel):
+    reviewer_id: str
+    reason: str
+
+
+class ResolveConflictPayload(BaseModel):
+    resolved_by: str
+    action: str  # CLEAR or REASSIGN
+    note: str | None = None
+
+
+class FinalizeGovernancePayload(BaseModel):
+    finalized_by: str
+    recommendation: str  # FAVORABLE, FAVORABLE_WITH_CONDITIONS, REQUIRES_REVISION, NOT_RECOMMENDED
+    note: str
+
+
 @router.get("/reviewer/queue", summary="Get reviewer assignment queue")
 def get_reviewer_queue(
     reviewer_id: str = Query(..., description="Reviewer ID"),
@@ -56,6 +73,73 @@ def return_for_revision(
         evaluation_id=evaluation_id,
         returned_by=payload.returned_by,
         reason=payload.reason,
+    )
+
+
+@router.post("/evaluations/{evaluation_id}/conflicts", summary="Declare conflict of interest")
+def declare_conflict(
+    evaluation_id: str,
+    payload: DeclareConflictPayload,
+    db: Session = Depends(get_db),
+):
+    """Declare a reviewer conflict of interest requiring human admin resolution."""
+    from app.services.multi_reviewer_governance import MultiReviewerGovernanceService
+    service = MultiReviewerGovernanceService(db)
+    return service.declare_conflict(
+        evaluation_id=evaluation_id,
+        reviewer_id=payload.reviewer_id,
+        reason=payload.reason,
+    )
+
+
+@router.post("/conflicts/{declaration_id}/resolve", summary="Resolve conflict declaration")
+def resolve_conflict(
+    declaration_id: str,
+    payload: ResolveConflictPayload,
+    db: Session = Depends(get_db),
+):
+    """Admin resolution of conflict declaration (CLEAR or REASSIGN)."""
+    from app.services.multi_reviewer_governance import MultiReviewerGovernanceService
+    service = MultiReviewerGovernanceService(db)
+    return service.resolve_conflict(
+        declaration_id=declaration_id,
+        resolved_by=payload.resolved_by,
+        action=payload.action,
+        note=payload.note,
+    )
+
+
+@router.get("/evaluations/{evaluation_id}/reviewer-comparison", summary="Get multi-reviewer comparison")
+def get_reviewer_comparison(
+    evaluation_id: str,
+    reviewer_id: str | None = Query(None, description="Requesting reviewer ID"),
+    role: str = Query("ADMIN", description="User role"),
+    db: Session = Depends(get_db),
+):
+    """Retrieve multi-reviewer score comparison with blinding policy enforcement."""
+    from app.services.multi_reviewer_governance import MultiReviewerGovernanceService
+    service = MultiReviewerGovernanceService(db)
+    return service.get_reviewer_comparison(
+        evaluation_id=evaluation_id,
+        requesting_reviewer_id=reviewer_id,
+        user_role=role,
+    )
+
+
+@router.post("/evaluations/{evaluation_id}/finalize-governance", summary="Finalize human governance recommendation")
+def finalize_governance(
+    evaluation_id: str,
+    payload: FinalizeGovernancePayload,
+    db: Session = Depends(get_db),
+):
+    """Finalize institutional governance evaluation record with human recommendation and explanation note."""
+    from app.services.multi_reviewer_governance import MultiReviewerGovernanceService
+    service = MultiReviewerGovernanceService(db)
+    return service.finalize_evaluation_governance(
+        evaluation_id=evaluation_id,
+        finalized_by=payload.finalized_by,
+        recommendation=payload.recommendation,
+        note=payload.note,
     )
 
 

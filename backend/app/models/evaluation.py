@@ -10,6 +10,7 @@ from app.core.database import Base
 if TYPE_CHECKING:
     from app.models.ai_analysis import AIAnalysis
     from app.models.assignment import EvaluationAssignment
+    from app.models.conflict import ReviewerConflictDeclaration
     from app.models.decision_pack import EvaluationDecisionPack
     from app.models.evaluation_audit import EvaluationAuditEvent
     from app.models.evaluation_evidence import EvaluationEvidence
@@ -29,10 +30,17 @@ class Evaluation(Base):
     rubric_version: Mapped[str] = mapped_column(String(50), nullable=False, default="v1.0")
 
     status: Mapped[str] = mapped_column(String(50), nullable=False, default="DRAFT")
+    consensus_status: Mapped[str] = mapped_column(String(50), nullable=False, default="NOT_STARTED")
     overall_score: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     reviewer_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     reviewer_recommendation: Mapped[str] = mapped_column(String(50), nullable=False, default="FAVORABLE_WITH_CONDITIONS")
+
+    # Governance & Consensus Fields (Phase P1.1)
+    final_governance_recommendation: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    final_governance_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    finalized_by: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    finalized_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -62,6 +70,9 @@ class Evaluation(Base):
     )
     assignments: Mapped[list["EvaluationAssignment"]] = relationship(
         "EvaluationAssignment", back_populates="evaluation", cascade="all, delete-orphan"
+    )
+    conflicts: Mapped[list["ReviewerConflictDeclaration"]] = relationship(
+        "ReviewerConflictDeclaration", back_populates="evaluation", cascade="all, delete-orphan"
     )
 
 

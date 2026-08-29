@@ -27,12 +27,14 @@ export interface Proposal {
   institution: Institution;
   domain: string;
   principalInvestigator: string;
+  extractedPrincipalInvestigator?: string | null;
   submittedDate: string;
   submissionDate?: string;
   status: ProposalStatus;
   priority: ProposalPriority;
-  proposedBudget: number;
-  budgetTotal?: number;
+  proposedBudget?: number | null;
+  budgetTotal?: number | null;
+  rawBudgetText?: string | null;
   durationMonths: number;
   summary: string;
   problemStatement?: string;
@@ -53,6 +55,7 @@ export interface HistoricalProject {
   projectCode: string;
   title: string;
   institution: Institution;
+  subImplementingAgencies?: string | null;
   domain: string;
   principalInvestigator: string;
   status: "COMPLETED" | "ONGOING" | "TERMINATED" | "NEEDS_REVIEW";

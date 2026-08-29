@@ -36,6 +36,7 @@ class HistoricalProjectCreate(ORMBase):
     project_code: str
     title: str
     institution: str
+    sub_implementing_agencies: str | None = None
     domain: str
     objectives: str | None = None
     methodology: str | None = None
@@ -63,6 +64,7 @@ class HistoricalProjectRead(ORMBase):
     project_code: str
     title: str
     institution: str
+    sub_implementing_agencies: str | None = None
     domain: str
     objectives: str | None = None
     methodology: str | None = None

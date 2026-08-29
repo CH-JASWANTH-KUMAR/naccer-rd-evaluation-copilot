@@ -8,6 +8,7 @@ import {
   FileText,
   Upload,
   Database,
+  BookOpen,
   ClipboardCheck,
   BarChart3,
   Settings,
@@ -161,6 +162,21 @@ export function Sidebar() {
             >
               <Database className="h-4 w-4 mr-2.5 text-slate-400" />
               Historical Projects
+            </Link>
+
+            {/* Research Papers */}
+            <Link
+              href="/research-papers"
+              onClick={() => setMobileMenuOpen(false)}
+              className={cn(
+                "flex items-center px-3 py-2 text-xs font-medium rounded-md transition-colors",
+                isParentActive("/research-papers")
+                  ? "bg-slate-800 text-white font-semibold shadow-xs"
+                  : "text-slate-300 hover:bg-slate-800/60 hover:text-white"
+              )}
+            >
+              <BookOpen className="h-4 w-4 mr-2.5 text-slate-400" />
+              Research Papers
             </Link>
 
             {/* Evaluations */}

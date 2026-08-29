@@ -184,3 +184,10 @@ def update_project_verification(project_id: str, payload: VerificationUpdate, db
     """Reviewer manual verification endpoint (sets status to VERIFIED or REJECTED)."""
     service = HistoricalProjectService(db)
     return service.update_verification_status(project_id, payload.verification_status)
+
+
+@router.post("/projects/seed", summary="Seed CIL ongoing R&D projects catalogue corpus")
+def seed_projects_endpoint(db: Session = Depends(get_db)):
+    """Admin endpoint to seed/ingest the 20 official CIL ongoing R&D projects into PostgreSQL."""
+    from app.services.seed import seed_demo_data
+    return seed_demo_data(db)

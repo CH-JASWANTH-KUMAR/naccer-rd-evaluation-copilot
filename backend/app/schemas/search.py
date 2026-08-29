@@ -39,8 +39,10 @@ class ProvenanceRead(ORMBase):
 class SimilarityResultItem(ORMBase):
     project_id: str
     project_code: str
+    evidence_id: str = Field(default="HIST-000", description="Deterministic Evidence ID (e.g. HIST-011)")
     project_title: str
     institution: str
+    sub_implementing_agencies: str | None = None
     domain: str
     status: str
     approved_cost: float
@@ -49,6 +51,7 @@ class SimilarityResultItem(ORMBase):
     similarity_percentage: int = Field(description="Relevance score percentage 0-100%")
     relationship: str = Field(description="POTENTIALLY_RELATED, CONCEPTUAL_OVERLAP, WEAK_RELATIONSHIP")
     matched_fields: list[str] = Field(default_factory=list)
+    matched_dimensions: list[str] = Field(default_factory=list, description="Matched technical dimensions (e.g. technology, objective, mining_context)")
     evidence: list[EvidenceItemRead] = Field(default_factory=list)
     provenance: ProvenanceRead
     summary: str | None = None

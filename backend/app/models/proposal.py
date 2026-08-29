@@ -30,6 +30,7 @@ class Proposal(Base):
         String(36), ForeignKey("institutions.id", ondelete="CASCADE"), nullable=False
     )
     principal_investigator: Mapped[str] = mapped_column(String(255), nullable=False)
+    extracted_principal_investigator: Mapped[str | None] = mapped_column(String(255), nullable=True)
     domain: Mapped[str] = mapped_column(String(255), nullable=False)
 
     problem_statement: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -43,7 +44,8 @@ class Proposal(Base):
 
     status: Mapped[str] = mapped_column(String(50), nullable=False, default="UNDER_REVIEW")
     priority: Mapped[str] = mapped_column(String(50), nullable=False, default="MEDIUM")
-    budget_total: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    budget_total: Mapped[float | None] = mapped_column(Float, nullable=True, default=None)
+    raw_budget_text: Mapped[str | None] = mapped_column(String(255), nullable=True)
     submission_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
 
     # Processing & Scrutiny Engine Fields

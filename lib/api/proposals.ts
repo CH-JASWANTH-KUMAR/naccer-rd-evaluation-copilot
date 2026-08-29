@@ -24,7 +24,9 @@ export interface FinancialComplianceReport {
   findings: Array<{
     costHead: string;
     proposedAmount: number;
+    rawAmountString?: string | null;
     complianceStatus: string;
+    sourcePage?: number | null;
     notes?: string | null;
   }>;
 }
@@ -55,6 +57,7 @@ interface ApiProposal {
   institution_id: string;
   institution?: { id: string; name: string; code: string; type: string; location: string };
   principal_investigator: string;
+  extracted_principal_investigator?: string | null;
   domain: string;
   problem_statement?: string | null;
   objectives?: string | null;
@@ -64,7 +67,8 @@ interface ApiProposal {
   duration_months?: number | null;
   status: string;
   priority: string;
-  budget_total: number;
+  budget_total?: number | null;
+  raw_budget_text?: string | null;
   completeness_status: "COMPLETE" | "INCOMPLETE";
   compliance_status: "COMPLIANT" | "FLAGGED" | "NEEDS_JUSTIFICATION";
   processing_status: string;
@@ -95,8 +99,10 @@ interface ApiSimilarityProvenance {
 interface ApiSimilarityItem {
   project_id: string;
   project_code: string;
+  evidence_id?: string;
   project_title: string;
   institution: string;
+  sub_implementing_agencies?: string | null;
   domain: string;
   status: string;
   approved_cost: number;
@@ -105,6 +111,7 @@ interface ApiSimilarityItem {
   similarity_percentage: number;
   relationship: "POTENTIALLY_RELATED" | "CONCEPTUAL_OVERLAP" | "WEAK_RELATIONSHIP";
   matched_fields: string[];
+  matched_dimensions?: string[];
   evidence: ApiSimilarityEvidence[];
   provenance: ApiSimilarityProvenance;
   summary?: string | null;
@@ -167,7 +174,25 @@ export const proposalService = {
     try {
       const res = await fetch(`${appConfig.apiBaseUrl}/proposals/${id}/source`, { cache: "no-store" });
       if (res.ok) {
-        return await res.json();
+        const raw = await res.json();
+        return {
+          proposalId: raw.proposal_id || raw.proposalId,
+          proposalReference: raw.proposal_reference || raw.proposalReference,
+          title: raw.title,
+          documents: ((raw.documents as Record<string, unknown>[]) || []).map((doc) => ({
+            documentId: (doc.document_id as string) || (doc.documentId as string) || "",
+            filename: (doc.filename as string) || "",
+            fileSize: (doc.file_size as number) ?? (doc.fileSize as number) ?? 0,
+            documentHash: (doc.document_hash as string) || (doc.documentHash as string) || null,
+            pageCount: (doc.page_count as number) ?? (doc.pageCount as number) ?? 0,
+            storagePath: (doc.storage_path as string) || (doc.storagePath as string) || "",
+            pages: (((doc.pages as Record<string, unknown>[]) || []).map((p) => ({
+              pageNumber: (p.page_number as number) ?? (p.pageNumber as number) ?? 1,
+              characterCount: (p.character_count as number) ?? (p.characterCount as number) ?? 0,
+              extractedText: (p.extracted_text as string) || (p.extractedText as string) || "",
+            }))),
+          })),
+        };
       }
     } catch {
       // Fallback
@@ -181,11 +206,15 @@ export const proposalService = {
       if (res.ok) {
         const raw = await res.json();
         return {
-          proposalId: raw.proposal_id,
+          proposalId: raw.proposal_id || raw.proposalId,
           status: raw.status,
-          missingFields: raw.missing_fields || [],
+          missingFields: raw.missing_fields || raw.missingFields || [],
           warnings: raw.warnings || [],
-          findings: raw.findings || [],
+          findings: ((raw.findings as Record<string, unknown>[]) || []).map((f) => ({
+            field: (f.field as string) || "",
+            severity: (f.severity as "ERROR" | "WARNING" | "INFO") || "INFO",
+            message: (f.message as string) || "",
+          })),
         };
       }
     } catch {
@@ -206,7 +235,14 @@ export const proposalService = {
           calculatedTotal: raw.calculated_total,
           arithmeticMismatch: raw.arithmetic_mismatch,
           differenceAmount: raw.difference_amount,
-          findings: raw.findings || [],
+          findings: ((raw.findings as Record<string, unknown>[]) || []).map((f) => ({
+            costHead: (f.cost_head as string) || (f.costHead as string) || "Cost Head Breakdown",
+            proposedAmount: (f.proposed_amount as number) ?? (f.proposedAmount as number) ?? 0,
+            rawAmountString: (f.raw_amount_string as string) || (f.rawAmountString as string) || null,
+            complianceStatus: (f.compliance_status as string) || (f.complianceStatus as string) || "COMPLIANT",
+            sourcePage: (f.source_page as number) || (f.sourcePage as number) || null,
+            notes: (f.notes as string) || null,
+          })),
         };
       }
     } catch {
@@ -238,8 +274,10 @@ export const proposalService = {
       results: ((data.results as ApiSimilarityItem[]) || []).map((item) => ({
         projectId: item.project_id,
         projectCode: item.project_code,
+        evidenceId: item.evidence_id || "HIST-000",
         projectTitle: item.project_title,
         institution: item.institution,
+        subImplementingAgencies: item.sub_implementing_agencies || null,
         domain: item.domain,
         status: item.status,
         approvedCost: item.approved_cost,
@@ -248,6 +286,7 @@ export const proposalService = {
         similarityPercentage: item.similarity_percentage,
         relationship: item.relationship,
         matchedFields: item.matched_fields || [],
+        matchedDimensions: item.matched_dimensions || [],
         evidence: (item.evidence || []).map((e) => ({
           field: e.field,
           snippet: e.snippet,
@@ -283,13 +322,15 @@ export const proposalService = {
         location: "India",
       },
       principalInvestigator: item.principal_investigator,
+      extractedPrincipalInvestigator: item.extracted_principal_investigator,
       domain: item.domain,
       status: (item.status as unknown) as Proposal["status"],
       priority: (item.priority as unknown) as Proposal["priority"],
       submittedDate: item.submission_date || item.created_at,
       submissionDate: item.submission_date || item.created_at,
-      proposedBudget: item.budget_total || 0,
-      budgetTotal: item.budget_total || 0,
+      proposedBudget: item.budget_total,
+      budgetTotal: item.budget_total,
+      rawBudgetText: item.raw_budget_text,
       proposalReference: item.proposal_reference || `PR-2026-${item.id.slice(0, 6)}`,
       summary: item.objectives || item.problem_statement || item.title,
       problemStatement: item.problem_statement || undefined,
